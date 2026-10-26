@@ -1,8 +1,10 @@
-/* NRF27 Dot Grid — CEP panel (Illustrator + InDesign). Geometry in JS via engine.js; host.jsx reads + draws. */
+/* NRF27 Dot Grid — panel UI shared by the CEP panel (Illustrator + InDesign) and the Figma plugin.
+ * Geometry runs here (engine.js). The host is reached through window.DGBridge if present (Figma), else CEP evalScript → host.jsx. */
 (function () {
   'use strict';
   var E = window.DotGrid, $ = function (id) { return document.getElementById(id); };
-  var CEP = window.__adobe_cep__ || null;
+  var CEP = window.__adobe_cep__ || null, BR = window.DGBridge || null, HOSTED = !!(CEP || BR);
+  var store = (BR && BR.storage) || { getItem: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, setItem: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
   var LS_PRESETS = 'nrf27-dotgrid.presets', LS_LAST = 'nrf27-dotgrid.last';
 
   // ---------------------------------------------------------------- presets
@@ -17,8 +19,8 @@
   };
   var PANEL_DEFAULTS = { autoDetect: true };
   function defaults() { var o = {}, k; for (k in E.DEFAULTS) o[k] = E.DEFAULTS[k]; for (k in PANEL_DEFAULTS) o[k] = PANEL_DEFAULTS[k]; return o; }
-  function userPresets() { try { return JSON.parse(localStorage.getItem(LS_PRESETS)) || {}; } catch (e) { return {}; } }
-  function saveUserPresets(p) { localStorage.setItem(LS_PRESETS, JSON.stringify(p)); }
+  function userPresets() { try { return JSON.parse(store.getItem(LS_PRESETS)) || {}; } catch (e) { return {}; } }
+  function saveUserPresets(p) { store.setItem(LS_PRESETS, JSON.stringify(p)); }
 
   // ---------------------------------------------------------------- state
   var st = {
@@ -54,12 +56,14 @@
     });
   }
   function call(fn, args) {
+    if (BR) return BR.call(fn, args || []);
     var a = (args || []).map(function (x) { return JSON.stringify(x); }).join(',');
     return ensureHost().then(function () { return evalHost('DG.' + fn + '(' + a + ')'); });
   }
 
   // ---------------------------------------------------------------- theme
   function applyTheme() {
+    if (BR) { document.body.classList.toggle('light', !document.documentElement.classList.contains('figma-dark')); document.body.classList.add('figma'); return; }
     if (!CEP) return;
     try { var env = JSON.parse(CEP.getHostEnvironment()), c = env.appSkinInfo.panelBackgroundColor.color;
       var lum = (c.red * 0.299 + c.green * 0.587 + c.blue * 0.114);
@@ -77,14 +81,17 @@
   // ---------------------------------------------------------------- load document/page
   function loadInfo() {
     return call('info').then(function (info) {
-      st.info = info.doc ? info : null;
+      st.info = info.doc && info.pages && info.pages.length ? info : null; st.app = info.app;
+      if (!st.info && info.app === 'figma') $('empty').innerHTML = '<p><b>Add or select a frame</b></p><p>The plugin works on one top-level frame at a time. It reads the frame\'s content and draws the NRF27 dot grid around it.</p>';
       $('empty').hidden = !!st.info; $('main').hidden = !st.info; document.querySelector('.bottom').hidden = !st.info;
-      $('appBadge').textContent = info.app === 'indesign' ? 'Id' : 'Ai'; $('appBadge').className = 'badge' + (info.app === 'indesign' ? ' id' : '');
+      $('appBadge').textContent = { indesign: 'Id', figma: 'Fg' }[info.app] || 'Ai'; $('appBadge').className = 'badge' + ({ indesign: ' id', figma: ' fg' }[info.app] || '');
+      document.querySelector('#layerSel').closest('.field').hidden = info.app === 'figma'; syncUI();
+      $('apply').textContent = info.app === 'figma' ? 'Apply to frame' : 'Apply to page'; $('remove').title = 'Remove the dot grid from this ' + (info.app === 'figma' ? 'frame' : 'page');
       if (!st.info) { $('docName').textContent = 'No document'; st.where = ''; return false; }
       $('docName').textContent = info.doc; $('docName').title = info.path || info.doc;
       var sel = $('pageSel'); sel.innerHTML = '';
       info.pages.forEach(function (p) { var o = document.createElement('option'); o.value = p.i;
-        o.textContent = (p.i + 1) + '. ' + p.name + '  ·  ' + fmtSize(p.W, p.H); sel.appendChild(o); });
+        o.textContent = (p.i + 1) + '. ' + p.name + '  ·  ' + (info.app === 'figma' ? Math.round(p.W) + '×' + Math.round(p.H) : fmtSize(p.W, p.H)); sel.appendChild(o); });
       st.page = info.active; sel.value = String(st.page);
       var ls = $('layerSel'); ls.innerHTML = '<option value="auto">Auto (by treatment)</option>';
       info.layers.forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; ls.appendChild(o); });
@@ -104,11 +111,11 @@
         var ex = scan.existing; if (ex.keep) st.keep[pageKey()] = ex.keep; if (ex.ignore) { var m = {}; ex.ignore.forEach(function (k) { m[k] = true; }); st.ignore[pageKey()] = m; }
         setSettings(ex, true); notice('This page already has a dot grid. Settings restored from it; Apply replaces it.');
       } else notice('');
-      if (scan.uvOther) notice(($('notice').textContent ? $('notice').textContent + ' ' : '') + 'The spot UV layer already has ' + scan.uvOther + ' other item' + (scan.uvOther > 1 ? 's' : '') + ' on this page. They are kept; delete them first if this grid replaces them.');
+      if (scan.uvOther) notice(($('notice').textContent ? $('notice').textContent + ' ' : '') + 'Found ' + scan.uvOther + ' other spot UV item' + (scan.uvOther > 1 ? 's' : '') + ' on this page. They are kept; delete them first if this grid replaces them.');
       return call('thumb', [st.page, 900]);
     }).then(function (path) {
       return new Promise(function (res) { var im = new Image(); im.onload = function () { st.img = im; res(); }; im.onerror = function () { st.img = null; res(); };
-        im.src = 'file://' + encodeURI(path).replace(/#/g, '%23') + '?' + Date.now(); });
+        im.src = /^(data|blob):/.test(path) ? path : 'file://' + encodeURI(path).replace(/#/g, '%23') + '?' + Date.now(); });
     }).then(function () { busy(false); recompute(); })
       .catch(function (e) { busy(false); status(e.message, 'err'); });
   }
@@ -241,7 +248,8 @@
     document.querySelectorAll('#treatSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === s.treatment); });
     document.querySelectorAll('#knockSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === s.knock); });
     var T = E.TREATMENTS[s.treatment];
-    $('treatDesc').textContent = s.treatment === 'spot' ? '100% "' + T.swatch + '" spot swatch, overprint, drawn on the document\'s spot UV layer (created if missing). Fades by size only.'
+    if (st.app === 'figma') $('treatDesc').textContent = (s.treatment === 'spot' ? 'Fills with the "NRF27/Spot UV" colour style (M100 preview of the varnish plate).' : 'Fills with the "NRF27/PMS 9285C" colour style (CMYK 4/3/7/0 preview).') + ' Figma has no spot colours or overprint, so assign the swatch in Illustrator/InDesign for print. Fades by size only.';
+    else $('treatDesc').textContent = s.treatment === 'spot' ? '100% "' + T.swatch + '" spot swatch, overprint, drawn on the document\'s spot UV layer (created if missing). Fades by size only.'
       : 'One "' + T.swatch + '" spot swatch (CMYK ' + T.cmyk.join('/') + ' fallback) on a "' + T.layer + '" layer above the background. Fades by size only.';
     $('knockSeg').style.opacity = s.autoDetect ? 1 : .5;
     syncOutputs();
@@ -270,8 +278,8 @@
   $('delPreset').addEventListener('click', function () { var v = $('presetSel').value; if (v.charAt(0) !== 'u') { status('Pick a saved preset to delete', 'err'); return; }
     var up = userPresets(); delete up[v.slice(2)]; saveUserPresets(up); fillPresets(); status('Deleted', 'ok'); });
   $('resetAll').addEventListener('click', function () { setSettings(defaults()); st.keep[pageKey()] = []; st.ignore[pageKey()] = {}; recompute(); status('Reset to NRF27 defaults', 'ok'); });
-  function saveLast() { try { localStorage.setItem(LS_LAST, JSON.stringify(st.s)); } catch (e) {} }
-  function loadLast() { try { var o = JSON.parse(localStorage.getItem(LS_LAST)); if (o) setSettings(o); else syncUI(); } catch (e) { syncUI(); } }
+  function saveLast() { try { store.setItem(LS_LAST, JSON.stringify(st.s)); } catch (e) {} }
+  function loadLast() { try { var o = JSON.parse(store.getItem(LS_LAST)); if (o) setSettings(o); else syncUI(); } catch (e) { syncUI(); } }
 
   // ---------------------------------------------------------------- actions
   $('pageSel').addEventListener('change', function () { st.page = +this.value; call('goTo', [st.page]).catch(function () {});
@@ -299,7 +307,7 @@
 
   // follow the host: document / page switches
   function poll() {
-    if (!CEP || st.busy || drag) return;
+    if (!HOSTED || st.busy || drag) return;
     call('where').then(function (w) {
       if (w === st.where) return;
       var doc = w.split('|')[0], prevDoc = st.where.split('|')[0];
@@ -311,9 +319,12 @@
   window.addEventListener('resize', function () { if (st.scan && st.result) draw(); });
 
   // ---------------------------------------------------------------- boot
+  function boot() {
   applyTheme();
   if (CEP && CEP.addEventListener) try { CEP.addEventListener('com.adobe.csxs.events.ThemeColorChanged', applyTheme); } catch (e) {}
   fillPresets(); loadLast();
-  if (!CEP) { $('empty').hidden = false; $('main').hidden = true; $('empty').innerHTML = '<p><b>Open this panel from Illustrator or InDesign</b></p><p>Window › Extensions › NRF27 Dot Grid</p>'; return; }
-  refreshAll().then(function () { setInterval(poll, 1500); });
+  if (!HOSTED) { $('empty').hidden = false; $('main').hidden = true; $('empty').innerHTML = '<p><b>Open this panel from Illustrator or InDesign</b></p><p>Window › Extensions › NRF27 Dot Grid</p>'; return; }
+  refreshAll().then(function () { setInterval(poll, BR ? 700 : 1500); });
+  }
+  if (BR && BR.ready) BR.ready.then(boot); else boot();
 })();

@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>NRF27 Dot Grid</title>
+  <style>
+:root {
+  --bg: #323232; --raised: #3c3c3c; --field: #1f1f1f; --line: #4a4a4a; --line-soft: #3f3f3f;
+  --text: #e4e4e4; --dim: #a3a3a3; --faint: #7a7a7a;
+  --accent: #378ef0; --accent-hi: #4b9cf5; --warn: #e8a33d; --ok: #4fbf6b; --err: #f06a5f;
+  --r: 4px; --fs: 11px;
+}
+body.light {
+  --bg: #f0f0f0; --raised: #ffffff; --field: #ffffff; --line: #c9c9c9; --line-soft: #dddddd;
+  --text: #222222; --dim: #5c5c5c; --faint: #8a8a8a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--text); font: var(--fs)/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; user-select: none; overflow: hidden; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+main { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 10px 10px; }
+main::-webkit-scrollbar { width: 8px; } main::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+[hidden] { display: none !important; }
+
+/* header */
+.top { padding: 8px 10px 6px; border-bottom: 1px solid var(--line-soft); display: grid; gap: 6px; }
+.doc-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.badge { flex: none; font-weight: 700; font-size: 10px; padding: 1px 5px; border-radius: 3px; background: #ff9a00; color: #330000; }
+.badge.id { background: #ff3366; color: #49021f; }
+.doc-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dim); }
+.icon-btn { flex: none; background: none; border: 1px solid transparent; color: var(--dim); border-radius: var(--r); width: 24px; height: 22px; display: grid; place-items: center; cursor: pointer; }
+.icon-btn:hover { border-color: var(--line); color: var(--text); }
+
+select, input[type=text] { width: 100%; background: var(--field); color: var(--text); border: 1px solid var(--line); border-radius: var(--r);
+  font: inherit; padding: 3px 6px; height: 24px; outline: none; }
+select:focus, input[type=text]:focus { border-color: var(--accent); }
+
+.empty { padding: 24px 16px; color: var(--dim); text-align: center; }
+.empty b { color: var(--text); }
+
+/* preview */
+.preview { padding-top: 10px; }
+.pv-wrap { position: relative; background: var(--field); border-radius: var(--r); padding: 8px; display: grid; place-items: center; }
+#pv { display: block; max-width: 100%; cursor: crosshair; border-radius: 1px; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.pv-busy { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.35); color: #fff; border-radius: var(--r); }
+.hint { margin: 5px 0 0; color: var(--faint); font-size: 10px; }
+.readout { margin-top: 6px; color: var(--text); font-variant-numeric: tabular-nums; }
+.readout .sub { color: var(--dim); display: block; }
+.warn { margin-top: 6px; padding: 5px 7px; border-radius: var(--r); background: rgba(232,163,61,.14); color: var(--warn); }
+.notice { margin-top: 6px; padding: 5px 7px; border-radius: var(--r); background: rgba(55,142,240,.14); color: var(--accent-hi); }
+
+/* sections */
+.sec { border-top: 1px solid var(--line-soft); margin-top: 10px; padding-top: 8px; display: grid; gap: 7px; }
+.sec h2 { margin: 0; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); }
+details.sec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+details.sec > summary::-webkit-details-marker { display: none; }
+details.sec > summary::before { content: '›'; color: var(--dim); transition: transform .15s; display: inline-block; }
+details.sec[open] > summary::before { transform: rotate(90deg); }
+.desc { margin: 0; color: var(--dim); font-size: 10px; }
+
+.fade-row { display: flex; gap: 10px; align-items: center; }
+.anchor-grid { flex: none; display: grid; grid-template-columns: repeat(3, 22px); grid-template-rows: repeat(3, 22px); gap: 3px; padding: 4px;
+  background: var(--field); border: 1px solid var(--line); border-radius: var(--r); }
+.anchor-grid button { margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 3px; background: var(--raised); cursor: pointer; position: relative; }
+.anchor-grid button::after { content: ''; position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--faint); left: 50%; top: 50%; transform: translate(-50%,-50%); }
+.anchor-grid button.edge::after { width: 10px; height: 3px; border-radius: 2px; }
+.anchor-grid button[data-a=l]::after, .anchor-grid button[data-a=r]::after { width: 3px; height: 10px; }
+.anchor-grid button.page::after { width: 12px; height: 12px; border-radius: 2px; background: none; border: 1.5px dotted var(--faint); }
+.anchor-grid button:hover { border-color: var(--dim); }
+.anchor-grid button.on { border-color: var(--accent); background: rgba(55,142,240,.22); }
+.anchor-grid button.on::after { background: var(--accent-hi); }
+.anchor-grid button.page.on::after { background: none; border-color: var(--accent-hi); }
+.fade-desc { display: grid; gap: 2px; min-width: 0; }
+.fade-desc span { color: var(--dim); font-size: 10px; }
+
+.slider { display: grid; grid-template-columns: 78px 1fr 46px; align-items: center; gap: 6px; }
+.slider span { color: var(--dim); }
+.slider output { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+input[type=range] { -webkit-appearance: none; width: 100%; height: 16px; background: transparent; margin: 0; }
+input[type=range]::-webkit-slider-runnable-track { height: 2px; background: var(--line); border-radius: 1px; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px; height: 11px; border-radius: 50%; background: var(--text); margin-top: -4.5px; border: 0; cursor: pointer; }
+input[type=range]:disabled { opacity: .4; }
+.check { display: flex; gap: 6px; align-items: center; color: var(--text); cursor: pointer; }
+.check input { margin: 0; accent-color: var(--accent); }
+.field { display: grid; grid-template-columns: 78px 1fr; align-items: center; gap: 6px; }
+.field > span { color: var(--dim); }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.seg button { background: var(--raised); color: var(--dim); border: 0; border-left: 1px solid var(--line); font: inherit; height: 24px; cursor: pointer; }
+.seg button:first-child { border-left: 0; }
+.seg button:hover { color: var(--text); }
+.seg button.on { background: rgba(55,142,240,.22); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.seg.small button { height: 22px; }
+
+.btn-row { display: flex; gap: 6px; align-items: center; }
+.btn-row input[type=text] { flex: 1; }
+.btn { background: var(--raised); color: var(--text); border: 1px solid var(--line); border-radius: var(--r); font: inherit; height: 24px; padding: 0 10px; cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--dim); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.quiet { background: transparent; color: var(--dim); }
+.btn.quiet:hover { color: var(--text); }
+.btn.block { width: 100%; }
+.btn.primary { flex: 1; background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; height: 28px; }
+.btn.primary:hover { background: var(--accent-hi); }
+
+.bottom { padding: 8px 10px 10px; border-top: 1px solid var(--line-soft); background: var(--bg); }
+.status { margin-top: 6px; min-height: 15px; color: var(--dim); font-size: 10px; }
+.status.ok { color: var(--ok); } .status.err { color: var(--err); }
+
+/* Figma plugin host (themeColors: true injects --figma-color-* and html.figma-dark/light) */
+.badge.fg { background: #a259ff; color: #fff; }
+body.figma { --bg: var(--figma-color-bg, #fff); --raised: var(--figma-color-bg, #fff); --field: var(--figma-color-bg-secondary, #f5f5f5);
+  --line: var(--figma-color-border, #e6e6e6); --line-soft: var(--figma-color-border, #e6e6e6);
+  --text: var(--figma-color-text, #222); --dim: var(--figma-color-text-secondary, #666); --faint: var(--figma-color-text-tertiary, #999);
+  --accent: var(--figma-color-bg-brand, #0d99ff); --accent-hi: var(--figma-color-bg-brand-hover, #0a85e0);
+  font-family: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif; }
+body.figma .doc-name { color: var(--text); }
+
+</style>
+</head>
+<body>
+  <div id="app">
+    <header class="top">
+      <div class="doc-row">
+        <span id="appBadge" class="badge">—</span>
+        <span id="docName" class="doc-name">No document</span>
+        <button id="rescan" class="icon-btn" title="Rescan the page">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M12.6 1.6v3.2H9.4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+        </button>
+      </div>
+      <select id="pageSel" aria-label="Page or artboard"></select>
+    </header>
+
+    <div id="empty" class="empty" hidden>
+      <p><b>Open an Illustrator or InDesign document</b></p>
+      <p>The panel reads the active page, finds the type and logos, and draws the NRF27 dot grid around them.</p>
+    </div>
+
+    <main id="main">
+      <section class="preview">
+        <div class="pv-wrap"><canvas id="pv"></canvas><div id="pvBusy" class="pv-busy" hidden>Reading page…</div></div>
+        <p class="hint">Drag on the preview to add a keep-clear box. Click detected content to ignore it, or a box to delete it.</p>
+        <div id="readout" class="readout"></div>
+        <div id="warn" class="warn" hidden></div>
+        <div id="notice" class="notice" hidden></div>
+      </section>
+
+      <section class="sec">
+        <h2>Fade</h2>
+        <div class="fade-row">
+          <div id="anchorGrid" class="anchor-grid" role="radiogroup" aria-label="Fade from">
+            <button data-a="tl" title="Top-left corner"></button><button data-a="t" class="edge" title="Top edge"></button><button data-a="tr" title="Top-right corner"></button>
+            <button data-a="l" class="edge" title="Left edge"></button><button data-a="page" class="page" title="Full page, receding around content"></button><button data-a="r" class="edge" title="Right edge"></button>
+            <button data-a="bl" title="Bottom-left corner"></button><button data-a="b" class="edge" title="Bottom edge"></button><button data-a="br" title="Bottom-right corner"></button>
+          </div>
+          <div class="fade-desc"><b id="fadeTitle">Full page</b><span id="fadeSub">Dots cover the page and shrink around the content.</span></div>
+        </div>
+        <label class="slider" data-show="corner edge"><span>Reach</span><input id="reach" type="range" min="15" max="150" step="1"><output id="reachOut"></output></label>
+        <label class="slider" data-show="page"><span>Softness</span><input id="softness" type="range" min="1" max="8" step="0.25"><output id="softnessOut"></output></label>
+        <label class="slider"><span>Smallest dot</span><input id="minDot" type="range" min="10" max="100" step="1"><output id="minDotOut"></output></label>
+        <label class="check" data-show="page"><input id="balance" type="checkbox"><span>Even gap around the main content</span></label>
+      </section>
+
+      <section class="sec">
+        <h2>Treatment</h2>
+        <div class="seg" id="treatSeg"><button data-v="spot">Spot UV</button><button data-v="color">Colour</button></div>
+        <p class="desc" id="treatDesc"></p>
+        <label class="field"><span>Layer</span><select id="layerSel"></select></label>
+      </section>
+
+      <section class="sec">
+        <h2>Grid</h2>
+        <label class="slider"><span>Density</span><input id="density" type="range" min="50" max="200" step="1"><output id="densityOut"></output></label>
+        <label class="slider"><span>Dot size</span><input id="size" type="range" min="50" max="200" step="1"><output id="sizeOut"></output></label>
+        <p class="desc" id="gridDesc"></p>
+      </section>
+
+      <section class="sec">
+        <h2>Keep clear</h2>
+        <label class="check"><input id="autoDetect" type="checkbox"><span>Avoid content automatically</span></label>
+        <div class="field"><span>Knock out</span><div class="seg small" id="knockSeg"><button data-v="rect">Bounds</button><button data-v="shape">Shape</button></div></div>
+        <label class="slider"><span>Clearance</span><input id="clearance" type="range" min="0" max="36" step="0.5"><output id="clearanceOut"></output></label>
+        <label class="check"><input id="clearAuto" type="checkbox"><span>Auto clearance (scales with the page)</span></label>
+        <div class="btn-row">
+          <button id="addSel" class="btn">Add selection</button>
+          <button id="clearBoxes" class="btn quiet">Clear boxes</button>
+        </div>
+        <p class="desc" id="keepDesc"></p>
+      </section>
+
+      <details class="sec adv">
+        <summary><h2>Advanced</h2></summary>
+        <label class="slider"><span>Trim margin</span><input id="margin" type="range" min="0" max="18" step="0.5"><output id="marginOut"></output></label>
+        <div class="field"><span>Preset</span><select id="presetSel"></select></div>
+        <div class="btn-row">
+          <input id="presetName" type="text" placeholder="Preset name, or paste a preset code">
+          <button id="savePreset" class="btn">Save</button>
+          <button id="delPreset" class="btn quiet" title="Delete the selected saved preset">Delete</button>
+        </div>
+        <button id="resetAll" class="btn quiet block">Reset to NRF27 defaults</button>
+      </details>
+    </main>
+
+    <footer class="bottom">
+      <div class="btn-row">
+        <button id="apply" class="btn primary">Apply to page</button>
+        <button id="remove" class="btn quiet" title="Remove the dot grid from this page">Remove</button>
+      </div>
+      <div id="status" class="status" aria-live="polite"></div>
+    </footer>
+  </div>
+  <script>
+/* NRF27 dot grid engine — shared by the CEP panel (Illustrator/InDesign) and the Quick site playground.
+ * Port of ~/ai-postcard/dots.py (the system used on the welcome sign, thank-you cards, postcard, name cards).
+ * Coordinates: points, page-relative, origin top-left, y down.
+ *
+ *   DotGrid.compute(page, obstacles, settings) → { dots: [[x, y, r], …], … }
+ *   page      = { W, H }                       trim size in pt
+ *   obstacles = [{ rect: [l, t, r, b], hull?: [[x, y], …], manual?: bool }]
+ */
+(function (root) {
+  'use strict';
+
+  var DEFAULTS = {
+    mode: 'page',        // 'page' = recede around content | 'corner' | 'edge'
+    anchor: 'bl',        // corner: tl tr bl br · edge: t r b l
+    reach: 0.6,          // corner/edge: fraction of the page diagonal (corner) or depth (edge) the dots cover
+    density: 1,          // ×lattice count (pitch ÷ density)
+    size: 1,             // ×dot size
+    minDot: 0.33,        // smallest dot as a fraction of the largest
+    softness: 3,         // fade distance around content, in grid cells
+    clearance: null,     // pt of empty space between dots and content; null = auto (13u)
+    knock: 'rect',       // 'rect' = content bounding boxes (balanced margins) | 'shape' = convex outline
+    margin: 4.5,         // pt: dot edges stay this far inside the trim (cut tolerance)
+    balance: true,       // page mode: nudge pitch ±15% so the gap round the main content is even on all sides
+    treatment: 'spot'    // 'spot' = 100% Spot UV overprint | 'color' = PMS 9285C spot (CMYK 4/3/7/0)
+  };
+
+  var TREATMENTS = {
+    spot:  { swatch: 'Spot UV',         cmyk: [0, 100, 0, 0], overprint: true,  layer: 'Spot UV',  display: '#e6007e' },
+    color: { swatch: 'PMS 9285C',       cmyk: [4, 3, 7, 0],   overprint: false, layer: 'Dot grid', display: '#f0ede6' }
+  };
+
+  function ss(t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }
+  function rdist(x, y, r) {
+    var dx = Math.max(r[0] - x, 0, x - r[2]), dy = Math.max(r[1] - y, 0, y - r[3]);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function expand(r, p) { return [r[0] - p, r[1] - p, r[2] + p, r[3] + p]; }
+
+  function hull(points) {
+    var pts = points.slice().sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    if (pts.length < 3) return pts;
+    var cr = function (o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); };
+    var lo = [], up = [], i;
+    for (i = 0; i < pts.length; i++) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], pts[i]) <= 0) lo.pop(); lo.push(pts[i]); }
+    for (i = pts.length - 1; i >= 0; i--) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], pts[i]) <= 0) up.pop(); up.push(pts[i]); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  }
+  // 0 inside the convex polygon, else the distance to it (orientation-agnostic)
+  function hdist(x, y, H) {
+    var n = H.length, pos = 0, neg = 0, md = 1e9;
+    for (var k = 0; k < n; k++) {
+      var a = H[k], c = H[(k + 1) % n], dx = c[0] - a[0], dy = c[1] - a[1];
+      var cr = dx * (y - a[1]) - dy * (x - a[0]); if (cr > 0) pos++; else if (cr < 0) neg++;
+      var L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L)) : 0;
+      var ex = a[0] + t * dx - x, ey = a[1] + t * dy - y; md = Math.min(md, Math.sqrt(ex * ex + ey * ey));
+    }
+    return (pos === 0 || neg === 0) ? 0 : md;
+  }
+
+  function merged(s) { var o = {}, k; for (k in DEFAULTS) o[k] = DEFAULTS[k]; for (k in s || {}) if (s[k] !== undefined) o[k] = s[k]; return o; }
+
+  // Base system: landing-page hero lattice scaled to the page's long side (u = L/1440), card proportions
+  // (pitch 42u·1.75 × 41u·1.75, dot r 2.5u·2). Density/size multiply on top.
+  function system(page, s) {
+    var u = Math.max(page.W, page.H) / 1440;
+    var px = 42 * u * 1.75 / s.density, py = 41 * u * 1.75 / s.density;
+    var R = Math.min(2.5 * u * 2 * s.size, 0.46 * Math.min(px, py));
+    return { u: u, px: px, py: py, R: R, clear: s.clearance == null ? 13 * u : s.clearance, pad: 8 * u };
+  }
+
+  function lattice(page, S, margin) {
+    var cols = Math.max(2, Math.round(page.W / S.px)), rows = Math.max(2, Math.round(page.H / S.py));
+    while (cols > 1 && (page.W - (cols - 1) * S.px) / 2 - S.R < margin) cols--;
+    while (rows > 1 && (page.H - (rows - 1) * S.py) / 2 - S.R < margin) rows--;
+    return { cols: cols, rows: rows, x0: (page.W - (cols - 1) * S.px) / 2, y0: (page.H - (rows - 1) * S.py) / 2 };
+  }
+
+  function anchorFade(x, y, page, s) {
+    var W = page.W, H = page.H, a = s.anchor, d, D;
+    if (s.mode === 'corner') {
+      var cx = a.charAt(1) === 'r' ? W : 0, cy = a.charAt(0) === 'b' ? H : 0;
+      d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)); D = Math.sqrt(W * W + H * H);
+    } else {
+      d = a === 't' ? y : a === 'b' ? H - y : a === 'l' ? x : W - x; D = (a === 't' || a === 'b') ? H : W;
+    }
+    var t = d / Math.max(1e-6, s.reach * D);
+    return t > 1 ? -1 : 1 - (1 - s.minDot) * ss(t);      // −1 = outside the reach → no dot
+  }
+
+  function run(page, obstacles, s, S) {
+    var G = lattice(page, S, s.margin), F = s.softness * S.px, dots = [], knocked = 0, rec = 0;
+    var obs = obstacles.map(function (o) {
+      return { rect: o.rect, pad: expand(o.rect, S.pad), hull: (s.knock === 'shape' && !o.manual && o.hull && o.hull.length > 2) ? o.hull : null };
+    });
+    for (var j = 0; j < G.rows; j++) for (var i = 0; i < G.cols; i++) {
+      var x = G.x0 + i * S.px, y = G.y0 + j * S.py, v = 0, k;
+      for (k = 0; k < obs.length; k++) v = Math.max(v, 1 - ss(rdist(x, y, obs[k].pad) / F));
+      var sc = 1 + (s.minDot - 1) * v;
+      if (s.mode !== 'page') { var sa = anchorFade(x, y, page, s); if (sa < 0) continue; sc = Math.min(sc, sa); }
+      var r = S.R * sc, hit = false;
+      for (k = 0; k < obs.length && !hit; k++)
+        hit = (obs[k].hull ? hdist(x, y, obs[k].hull) : rdist(x, y, obs[k].rect)) < r + S.clear;
+      if (hit) { knocked++; continue; }
+      dots.push([x, y, r]); if (sc < 0.999) rec++;
+    }
+    return { dots: dots, grid: G, knocked: knocked, receded: rec };
+  }
+
+  // Gap from the main content block to the nearest dot edge on each side (null if no dot faces that side)
+  function gaps(dots, o) {
+    var g = { l: null, r: null, t: null, b: null };
+    var r = o.rect;
+    for (var i = 0; i < dots.length; i++) {
+      var x = dots[i][0], y = dots[i][1], d = dots[i][2], v;
+      if (y >= r[1] && y <= r[3]) {
+        if (x < r[0]) { v = r[0] - (x + d); if (g.l === null || v < g.l) g.l = v; }
+        if (x > r[2]) { v = (x - d) - r[2]; if (g.r === null || v < g.r) g.r = v; }
+      }
+      if (x >= r[0] && x <= r[2]) {
+        if (y < r[1]) { v = r[1] - (y + d); if (g.t === null || v < g.t) g.t = v; }
+        if (y > r[3]) { v = (y - d) - r[3]; if (g.b === null || v < g.b) g.b = v; }
+      }
+    }
+    return g;
+  }
+  function spread(g) {
+    var v = [g.l, g.r, g.t, g.b].filter(function (x) { return x !== null; });
+    return v.length < 2 ? 0 : Math.max.apply(null, v) - Math.min.apply(null, v);
+  }
+  function meanGap(g) {
+    var v = [g.l, g.r, g.t, g.b].filter(function (x) { return x !== null; });
+    return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+  }
+  function mainBlock(obstacles) {
+    var best = null, A = -1;
+    obstacles.forEach(function (o) { var a = (o.rect[2] - o.rect[0]) * (o.rect[3] - o.rect[1]); if (!o.manual && a > A) { A = a; best = o; } });
+    return best;
+  }
+
+  function compute(page, obstacles, settings) {
+    var s = merged(settings); obstacles = obstacles || [];
+    var main = mainBlock(obstacles), m = 1, out, S;
+    if (s.balance && s.mode === 'page' && main) {
+      var best = null;
+      // cost: uneven sides (relative) + gaps that hug the content (< 0.7 pitch) + distance from the requested density
+      for (var k = -60; k <= 60; k++) {
+        var mk = 1 + k * 0.0025, s2 = merged(s); s2.density = s.density * mk;
+        var S2 = system(page, s2), o2 = run(page, obstacles, s2, S2), g = gaps(o2.dots, main), mean = meanGap(g);
+        var c = mean === null ? 9 : spread(g) / Math.max(mean, 0.01) + 0.8 * Math.max(0, 0.7 - mean / S2.px) + 0.6 * Math.abs(mk - 1);
+        if (!best || c < best.c - 1e-9) best = { c: c, m: mk, S: S2, out: o2 };
+      }
+      m = best.m; S = best.S; out = best.out;
+    } else { S = system(page, s); out = run(page, obstacles, s, S); }
+    var rs = out.dots.map(function (d) { return d[2]; });
+    return {
+      dots: out.dots, cols: out.grid.cols, rows: out.grid.rows, px: S.px, py: S.py, R: S.R, clear: S.clear,
+      minD: rs.length ? 2 * Math.min.apply(null, rs) : 0, maxD: rs.length ? 2 * Math.max.apply(null, rs) : 0,
+      knocked: out.knocked, receded: out.receded, pitchAdjust: m,
+      edge: { x: out.grid.x0 - S.R, y: out.grid.y0 - S.R },
+      gaps: main ? gaps(out.dots, main) : null, settings: s, treatment: TREATMENTS[s.treatment]
+    };
+  }
+
+  var api = { compute: compute, hull: hull, DEFAULTS: DEFAULTS, TREATMENTS: TREATMENTS, version: '1.0.0' };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.DotGrid = api;
+})(typeof window !== 'undefined' ? window : this);
+
+</script>
+<script>
+/* Figma UI-side bridge: lets the shared panel (panel.js) talk to figma/code.js over postMessage. */
+window.DGBridge = (function () {
+  var seq = 0, pend = {}, cache = {}, readyRes, ready = new Promise(function (r) { readyRes = r; });
+  setTimeout(function () { readyRes(); }, 1500);                      // never hang if storage is slow
+  window.onmessage = function (e) {
+    var m = e.data && e.data.pluginMessage; if (!m) return;
+    if (m.type === 'storage') { cache = m.data || {}; readyRes(); return; }
+    var p = pend[m.id]; if (!p) return; delete pend[m.id];
+    if (!m.ok) return p.rej(new Error(m.error));
+    var d = m.data;
+    if (d && d.__png) d = URL.createObjectURL(new Blob([d.__png], { type: 'image/png' }));
+    p.res(d);
+  };
+  function post(msg) { parent.postMessage({ pluginMessage: msg }, '*'); }
+  return {
+    ready: ready,
+    call: function (fn, args) { return new Promise(function (res, rej) { var id = ++seq; pend[id] = { res: res, rej: rej }; post({ id: id, fn: fn, args: args }); }); },
+    storage: {
+      getItem: function (k) { return Object.prototype.hasOwnProperty.call(cache, k) ? cache[k] : null; },
+      setItem: function (k, v) { cache[k] = v; post({ type: 'store', key: k, value: v }); }
+    }
+  };
+})();
+
+</script>
+  <script>
+/* NRF27 Dot Grid — panel UI shared by the CEP panel (Illustrator + InDesign) and the Figma plugin.
+ * Geometry runs here (engine.js). The host is reached through window.DGBridge if present (Figma), else CEP evalScript → host.jsx. */
+(function () {
+  'use strict';
+  var E = window.DotGrid, $ = function (id) { return document.getElementById(id); };
+  var CEP = window.__adobe_cep__ || null, BR = window.DGBridge || null, HOSTED = !!(CEP || BR);
+  var store = (BR && BR.storage) || { getItem: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, setItem: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+  var LS_PRESETS = 'nrf27-dotgrid.presets', LS_LAST = 'nrf27-dotgrid.last';
+
+  // ---------------------------------------------------------------- presets
+  var BUILTIN = {
+    'NRF27 default':    {},
+    'Thank-you card':   { mode: 'page', minDot: 0.31, clearance: 4.5, softness: 3 },
+    'Postcard':         { mode: 'page', minDot: 0.37, clearance: 4,   softness: 3 },
+    'Welcome sign':     { mode: 'page', minDot: 0.3,  clearance: null, knock: 'shape', softness: 3 },
+    'Name card (uniform)': { mode: 'page', autoDetect: false, minDot: 1 },
+    'Corner fade':      { mode: 'corner', anchor: 'bl', reach: 0.6 },
+    'Edge fade':        { mode: 'edge', anchor: 'b', reach: 0.45 }
+  };
+  var PANEL_DEFAULTS = { autoDetect: true };
+  function defaults() { var o = {}, k; for (k in E.DEFAULTS) o[k] = E.DEFAULTS[k]; for (k in PANEL_DEFAULTS) o[k] = PANEL_DEFAULTS[k]; return o; }
+  function userPresets() { try { return JSON.parse(store.getItem(LS_PRESETS)) || {}; } catch (e) { return {}; } }
+  function saveUserPresets(p) { store.setItem(LS_PRESETS, JSON.stringify(p)); }
+
+  // ---------------------------------------------------------------- state
+  var st = {
+    s: defaults(), info: null, page: null, scan: null, img: null, result: null,
+    keep: {}, ignore: {},           // per page key: manual boxes [[l,t,r,b]], ignored obstacle keys {key:true}
+    where: '', busy: false, hostReady: false
+  };
+  function pageKey() { return st.info ? st.info.doc + '#' + st.page : ''; }
+  function keepList() { return st.keep[pageKey()] || (st.keep[pageKey()] = []); }
+  function ignoreSet() { return st.ignore[pageKey()] || (st.ignore[pageKey()] = {}); }
+  function obsKey(o) { return o.rect.map(function (v) { return Math.round(v); }).join(','); }
+
+  // ---------------------------------------------------------------- host bridge
+  function evalHost(script) {
+    return new Promise(function (resolve, reject) {
+      if (!CEP) return reject(new Error('Not running inside Illustrator or InDesign'));
+      CEP.evalScript(script, function (res) {
+        if (res === 'EvalScript error.' || res === undefined) return reject(new Error('Host script error'));
+        var o; try { o = JSON.parse(res); } catch (e) { return reject(new Error(String(res).slice(0, 200))); }
+        if (!o.ok) return reject(new Error(o.error)); resolve(o.data);
+      });
+    });
+  }
+  function extPath() { var p = decodeURI(CEP.getSystemPath('extension')); return p.replace(/^file:\/{2,3}/, '/').replace(/^\/([A-Za-z]:)/, '$1'); }
+  function ensureHost() {
+    if (st.hostReady) return Promise.resolve();
+    var f = extPath() + '/host/host.jsx';
+    return new Promise(function (res) {
+      CEP.evalScript('typeof DG', function (t) {
+        if (t === 'object') { st.hostReady = true; return res(); }
+        CEP.evalScript('$.evalFile(' + JSON.stringify(f) + ')', function () { st.hostReady = true; res(); });
+      });
+    });
+  }
+  function call(fn, args) {
+    if (BR) return BR.call(fn, args || []);
+    var a = (args || []).map(function (x) { return JSON.stringify(x); }).join(',');
+    return ensureHost().then(function () { return evalHost('DG.' + fn + '(' + a + ')'); });
+  }
+
+  // ---------------------------------------------------------------- theme
+  function applyTheme() {
+    if (BR) { document.body.classList.toggle('light', !document.documentElement.classList.contains('figma-dark')); document.body.classList.add('figma'); return; }
+    if (!CEP) return;
+    try { var env = JSON.parse(CEP.getHostEnvironment()), c = env.appSkinInfo.panelBackgroundColor.color;
+      var lum = (c.red * 0.299 + c.green * 0.587 + c.blue * 0.114);
+      document.body.classList.toggle('light', lum > 140);
+      document.documentElement.style.setProperty('--bg', 'rgb(' + [c.red, c.green, c.blue].map(Math.round).join(',') + ')');
+    } catch (e) {}
+  }
+
+  // ---------------------------------------------------------------- status
+  var stT;
+  function status(msg, kind) { var el = $('status'); el.textContent = msg || ''; el.className = 'status' + (kind ? ' ' + kind : '');
+    clearTimeout(stT); if (kind === 'ok') stT = setTimeout(function () { el.textContent = ''; el.className = 'status'; }, 4000); }
+  function busy(on, label) { st.busy = on; $('pvBusy').hidden = !on; if (label) $('pvBusy').textContent = label; $('apply').disabled = on || !st.result; $('remove').disabled = on; }
+
+  // ---------------------------------------------------------------- load document/page
+  function loadInfo() {
+    return call('info').then(function (info) {
+      st.info = info.doc && info.pages && info.pages.length ? info : null; st.app = info.app;
+      if (!st.info && info.app === 'figma') $('empty').innerHTML = '<p><b>Add or select a frame</b></p><p>The plugin works on one top-level frame at a time. It reads the frame\'s content and draws the NRF27 dot grid around it.</p>';
+      $('empty').hidden = !!st.info; $('main').hidden = !st.info; document.querySelector('.bottom').hidden = !st.info;
+      $('appBadge').textContent = { indesign: 'Id', figma: 'Fg' }[info.app] || 'Ai'; $('appBadge').className = 'badge' + ({ indesign: ' id', figma: ' fg' }[info.app] || '');
+      document.querySelector('#layerSel').closest('.field').hidden = info.app === 'figma'; syncUI();
+      $('apply').textContent = info.app === 'figma' ? 'Apply to frame' : 'Apply to page'; $('remove').title = 'Remove the dot grid from this ' + (info.app === 'figma' ? 'frame' : 'page');
+      if (!st.info) { $('docName').textContent = 'No document'; st.where = ''; return false; }
+      $('docName').textContent = info.doc; $('docName').title = info.path || info.doc;
+      var sel = $('pageSel'); sel.innerHTML = '';
+      info.pages.forEach(function (p) { var o = document.createElement('option'); o.value = p.i;
+        o.textContent = (p.i + 1) + '. ' + p.name + '  ·  ' + (info.app === 'figma' ? Math.round(p.W) + '×' + Math.round(p.H) : fmtSize(p.W, p.H)); sel.appendChild(o); });
+      st.page = info.active; sel.value = String(st.page);
+      var ls = $('layerSel'); ls.innerHTML = '<option value="auto">Auto (by treatment)</option>';
+      info.layers.forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; ls.appendChild(o); });
+      st.where = info.doc + '|' + info.active;
+      return true;
+    });
+  }
+  function fmtSize(W, H) { return (W / 72).toFixed(2).replace(/\.?0+$/, '') + '×' + (H / 72).toFixed(2).replace(/\.?0+$/, '') + ' in'; }
+
+  function loadPage() {
+    if (!st.info) return Promise.resolve();
+    busy(true, 'Reading page…'); status('');
+    return call('scan', [st.page, { shape: true }]).then(function (scan) {
+      st.scan = scan;
+      scan.obstacles.forEach(function (o) { if (!o.manual && o.pts && o.pts.length > 2) o.hull = E.hull(o.pts); delete o.pts; });
+      if (scan.existing) {                                     // restore what was used last time on this page
+        var ex = scan.existing; if (ex.keep) st.keep[pageKey()] = ex.keep; if (ex.ignore) { var m = {}; ex.ignore.forEach(function (k) { m[k] = true; }); st.ignore[pageKey()] = m; }
+        setSettings(ex, true); notice('This page already has a dot grid. Settings restored from it; Apply replaces it.');
+      } else notice('');
+      if (scan.uvOther) notice(($('notice').textContent ? $('notice').textContent + ' ' : '') + 'Found ' + scan.uvOther + ' other spot UV item' + (scan.uvOther > 1 ? 's' : '') + ' on this page. They are kept; delete them first if this grid replaces them.');
+      return call('thumb', [st.page, 900]);
+    }).then(function (path) {
+      return new Promise(function (res) { var im = new Image(); im.onload = function () { st.img = im; res(); }; im.onerror = function () { st.img = null; res(); };
+        im.src = /^(data|blob):/.test(path) ? path : 'file://' + encodeURI(path).replace(/#/g, '%23') + '?' + Date.now(); });
+    }).then(function () { busy(false); recompute(); })
+      .catch(function (e) { busy(false); status(e.message, 'err'); });
+  }
+  function refreshAll() { return loadInfo().then(function (has) { if (has) return loadPage(); }).catch(function (e) { status(e.message, 'err'); }); }
+  function notice(t) { $('notice').hidden = !t; $('notice').textContent = t || ''; }
+
+  // ---------------------------------------------------------------- compute + preview
+  function obstaclesFor() {
+    var out = [], ig = ignoreSet();
+    if (st.s.autoDetect && st.scan) st.scan.obstacles.forEach(function (o) { if (!o.manual && !ig[obsKey(o)]) out.push({ rect: o.rect, hull: o.hull }); });
+    if (st.scan) st.scan.obstacles.forEach(function (o) { if (o.manual) out.push({ rect: o.rect, manual: true }); });
+    keepList().forEach(function (r) { out.push({ rect: r, manual: true }); });
+    return out;
+  }
+  var rq;
+  function recompute() { cancelAnimationFrame(rq); rq = requestAnimationFrame(function () {
+    if (!st.scan) return;
+    var s = engineSettings(), t0 = performance.now();
+    st.result = E.compute(st.scan.page, obstaclesFor(), s);
+    st.result.ms = performance.now() - t0;
+    draw(); readout(); $('apply').disabled = st.busy || !st.result.dots.length;
+    saveLast();
+  }); }
+  function engineSettings() { var o = {}, k; for (k in E.DEFAULTS) o[k] = st.s[k]; return o; }
+
+  var view = { k: 1, ox: 0, oy: 0 };
+  function draw() {
+    var cv = $('pv'), wrap = cv.parentNode, P = st.scan.page, dpr = window.devicePixelRatio || 1;
+    var maxW = wrap.clientWidth - 16, maxH = Math.min(420, window.innerHeight * 0.45), k = Math.min(maxW / P.W, maxH / P.H);
+    var w = Math.round(P.W * k), h = Math.round(P.H * k);
+    cv.style.width = w + 'px'; cv.style.height = h + 'px'; cv.width = w * dpr; cv.height = h * dpr;
+    view.k = k; var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.fillStyle = '#fff'; c.fillRect(0, 0, w, h);
+    if (st.img) c.drawImage(st.img, 0, 0, w, h);
+    c.save(); c.scale(k, k);
+    var T = E.TREATMENTS[st.s.treatment], light = st.s.treatment === 'color';
+    c.fillStyle = T.display; c.globalAlpha = light ? 1 : 0.9;
+    c.beginPath(); st.result.dots.forEach(function (d) { c.moveTo(d[0] + d[2], d[1]); c.arc(d[0], d[1], d[2], 0, Math.PI * 2); }); c.fill();
+    if (light) { c.globalAlpha = 0.45; c.lineWidth = 0.6 / k; c.strokeStyle = '#6b665c'; c.stroke(); }
+    c.globalAlpha = 1;
+    // overlays
+    var ig = ignoreSet(); c.lineWidth = 1 / k;
+    if (st.s.autoDetect) st.scan.obstacles.forEach(function (o) { if (o.manual) return; var off = ig[obsKey(o)];
+      c.setLineDash(off ? [2 / k, 3 / k] : [3 / k, 2 / k]); c.strokeStyle = off ? 'rgba(150,150,150,.9)' : 'rgba(0,170,255,.85)';
+      rect(c, o.rect); if (off) { c.beginPath(); c.moveTo(o.rect[0], o.rect[1]); c.lineTo(o.rect[2], o.rect[3]); c.stroke(); }
+      if (st.s.knock === 'shape' && o.hull && !off) { c.setLineDash([]); c.strokeStyle = 'rgba(0,170,255,.45)'; c.beginPath(); o.hull.forEach(function (p, i) { i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath(); c.stroke(); } });
+    c.setLineDash([4 / k, 2 / k]); c.strokeStyle = '#ff00c8'; c.fillStyle = 'rgba(255,0,200,.10)';
+    st.scan.obstacles.forEach(function (o) { if (o.manual) { rect(c, o.rect, true); } });
+    keepList().forEach(function (r) { rect(c, r, true); });
+    if (drag && drag.moved) { c.setLineDash([2 / k, 2 / k]); rect(c, normRect(drag), true); }
+    c.setLineDash([]);
+    // trim margin guide
+    if (st.s.margin > 0) { c.strokeStyle = 'rgba(255,80,80,.35)'; c.setLineDash([1 / k, 3 / k]); c.strokeRect(st.s.margin, st.s.margin, P.W - 2 * st.s.margin, P.H - 2 * st.s.margin); c.setLineDash([]); }
+    c.restore();
+  }
+  function rect(c, r, fill) { if (fill) c.fillRect(r[0], r[1], r[2] - r[0], r[3] - r[1]); c.strokeRect(r[0], r[1], r[2] - r[0], r[3] - r[1]); }
+
+  function readout() {
+    var r = st.result, g = r.gaps, f = function (v) { return v === null ? '—' : v.toFixed(1); };
+    var line1 = r.dots.length + ' dots  ·  ' + r.cols + '×' + r.rows + ' grid  ·  ' + r.minD.toFixed(2) + '–' + r.maxD.toFixed(2) + ' pt';
+    var line2 = 'Pitch ' + r.px.toFixed(1) + '×' + r.py.toFixed(1) + ' pt' + (Math.abs(r.pitchAdjust - 1) > 0.001 ? ' (balanced ' + (r.pitchAdjust > 1 ? '+' : '') + ((r.pitchAdjust - 1) * 100).toFixed(1) + '%)' : '') + '  ·  clearance ' + r.clear.toFixed(1) + ' pt';
+    var line3 = g && st.s.mode === 'page' ? 'Gap round main content  L ' + f(g.l) + '  R ' + f(g.r) + '  T ' + f(g.t) + '  B ' + f(g.b) + ' pt' : '';
+    $('readout').innerHTML = esc(line1) + '<span class="sub">' + esc(line2) + '</span>' + (line3 ? '<span class="sub">' + esc(line3) + '</span>' : '');
+    var w = [];
+    if (r.minD < 0.5) w.push('Smallest dot is ' + r.minD.toFixed(2) + ' pt; dots under ~0.5 pt may not hold on press. Raise Smallest dot or Dot size.');
+    if (r.clear < 2) w.push('Clearance under 2 pt: dots may touch content after trim/registration shift.');
+    if (!r.dots.length) w.push('No dots fit. Reduce clearance, increase reach, or check keep-clear boxes.');
+    if (st.scan.skippedBackgrounds) $('keepDesc').textContent = 'Detected ' + st.scan.obstacles.filter(function (o) { return !o.manual; }).length + ' content items; ignored ' + st.scan.skippedBackgrounds + ' full-page background' + (st.scan.skippedBackgrounds > 1 ? 's' : '') + '.';
+    else $('keepDesc').textContent = 'Detected ' + st.scan.obstacles.filter(function (o) { return !o.manual; }).length + ' content items.';
+    $('warn').hidden = !w.length; $('warn').textContent = w.join(' ');
+    var u = Math.max(st.scan.page.W, st.scan.page.H) / 1440;
+    $('gridDesc').textContent = 'Scales with the page (u = ' + u.toFixed(3) + ' pt). Base dot ' + (2 * r.R).toFixed(2) + ' pt.';
+  }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  // ---------------------------------------------------------------- preview interaction
+  var drag = null;
+  function toPt(ev) { var b = $('pv').getBoundingClientRect(); return [(ev.clientX - b.left) / view.k, (ev.clientY - b.top) / view.k]; }
+  function normRect(d) { return [Math.min(d.a[0], d.b[0]), Math.min(d.a[1], d.b[1]), Math.max(d.a[0], d.b[0]), Math.max(d.a[1], d.b[1])]; }
+  function inR(p, r) { return p[0] >= r[0] && p[0] <= r[2] && p[1] >= r[1] && p[1] <= r[3]; }
+  $('pv').addEventListener('mousedown', function (ev) { if (!st.scan) return; drag = { a: toPt(ev), b: toPt(ev), moved: false }; });
+  window.addEventListener('mousemove', function (ev) { if (!drag) return; drag.b = toPt(ev);
+    if (Math.abs(drag.b[0] - drag.a[0]) * view.k > 4 || Math.abs(drag.b[1] - drag.a[1]) * view.k > 4) drag.moved = true; if (drag.moved) draw(); });
+  window.addEventListener('mouseup', function () { if (!drag) return; var d = drag; drag = null;
+    if (d.moved) { var r = normRect(d), P = st.scan.page; r = [Math.max(0, r[0]), Math.max(0, r[1]), Math.min(P.W, r[2]), Math.min(P.H, r[3])];
+      keepList().push(r.map(function (v) { return Math.round(v * 10) / 10; })); recompute(); return; }
+    var p = d.a, L = keepList();
+    for (var i = L.length - 1; i >= 0; i--) if (inR(p, L[i])) { L.splice(i, 1); recompute(); return; }
+    if (!st.s.autoDetect) return;
+    var hits = st.scan.obstacles.filter(function (o) { return !o.manual && inR(p, o.rect); })
+      .sort(function (a, b) { return area(a.rect) - area(b.rect); });
+    if (hits.length) { var ig = ignoreSet(), k = obsKey(hits[0]); if (ig[k]) delete ig[k]; else ig[k] = true; recompute(); }
+  });
+  function area(r) { return (r[2] - r[0]) * (r[3] - r[1]); }
+
+  // ---------------------------------------------------------------- controls
+  var SL = {
+    reach:     { k: 'reach',     f: 100, out: function (v) { return Math.round(v * 100) + '%'; } },
+    softness:  { k: 'softness',  f: 1,   out: function (v) { return v.toFixed(2).replace(/0$/, '') + ' cells'; } },
+    minDot:    { k: 'minDot',    f: 100, out: function (v) { return Math.round(v * 100) + '%'; } },
+    density:   { k: 'density',   f: 100, out: function (v) { return Math.round(v * 100) + '%'; } },
+    size:      { k: 'size',      f: 100, out: function (v) { return Math.round(v * 100) + '%'; } },
+    clearance: { k: 'clearance', f: 1,   out: function (v) { return v == null ? 'auto' : v.toFixed(1) + ' pt'; } },
+    margin:    { k: 'margin',    f: 1,   out: function (v) { return v.toFixed(1) + ' pt'; } }
+  };
+  Object.keys(SL).forEach(function (id) { var d = SL[id];
+    $(id).addEventListener('input', function () { st.s[d.k] = +this.value / d.f; if (id === 'clearance') $('clearAuto').checked = false; syncOutputs(); recompute(); });
+  });
+  function autoClear() { return st.scan ? 13 * Math.max(st.scan.page.W, st.scan.page.H) / 1440 : 4; }
+  $('clearAuto').addEventListener('change', function () { st.s.clearance = this.checked ? null : +(+$('clearance').value).toFixed(1); syncUI(); recompute(); });
+  $('balance').addEventListener('change', function () { st.s.balance = this.checked; recompute(); });
+  $('autoDetect').addEventListener('change', function () { st.s.autoDetect = this.checked; syncUI(); recompute(); });
+  seg('treatSeg', 'treatment'); seg('knockSeg', 'knock');
+  function seg(id, key) { $(id).addEventListener('click', function (ev) { var b = ev.target.closest('button'); if (!b) return; st.s[key] = b.dataset.v; syncUI(); recompute(); }); }
+  $('anchorGrid').addEventListener('click', function (ev) { var b = ev.target.closest('button'); if (!b) return; var a = b.dataset.a;
+    if (a === 'page') st.s.mode = 'page'; else { st.s.mode = a.length === 2 ? 'corner' : 'edge'; st.s.anchor = a;
+      if (st.s.mode === 'edge' && st.s.reach > 1) st.s.reach = 0.6; }
+    syncUI(); recompute(); });
+
+  var NAMES = { tl: 'top-left corner', tr: 'top-right corner', bl: 'bottom-left corner', br: 'bottom-right corner', t: 'top edge', r: 'right edge', b: 'bottom edge', l: 'left edge' };
+  function syncOutputs() { Object.keys(SL).forEach(function (id) { var d = SL[id]; $(id + 'Out').textContent = d.out(id === 'clearance' && st.s.clearance == null ? null : st.s[d.k]); }); }
+  function syncUI() {
+    var s = st.s, mode = s.mode;
+    Object.keys(SL).forEach(function (id) { var d = SL[id], v = s[d.k]; if (id === 'clearance' && v == null) v = autoClear(); $(id).value = v * d.f; });
+    $('clearAuto').checked = s.clearance == null; $('balance').checked = !!s.balance; $('autoDetect').checked = !!s.autoDetect;
+    document.querySelectorAll('[data-show]').forEach(function (el) { el.hidden = el.dataset.show.split(' ').indexOf(mode) < 0; });
+    document.querySelectorAll('#anchorGrid button').forEach(function (b) { var a = b.dataset.a; b.classList.toggle('on', a === 'page' ? mode === 'page' : (mode !== 'page' && a === s.anchor)); });
+    $('fadeTitle').textContent = mode === 'page' ? 'Full page' : 'From the ' + NAMES[s.anchor];
+    $('fadeSub').textContent = mode === 'page' ? 'Dots cover the page and shrink around the content.' : 'Dots shrink away from the ' + (mode === 'corner' ? 'corner' : 'edge') + ' and stop at the reach. Content is still kept clear.';
+    document.querySelectorAll('#treatSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === s.treatment); });
+    document.querySelectorAll('#knockSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === s.knock); });
+    var T = E.TREATMENTS[s.treatment];
+    if (st.app === 'figma') $('treatDesc').textContent = (s.treatment === 'spot' ? 'Fills with the "NRF27/Spot UV" colour style (M100 preview of the varnish plate).' : 'Fills with the "NRF27/PMS 9285C" colour style (CMYK 4/3/7/0 preview).') + ' Figma has no spot colours or overprint, so assign the swatch in Illustrator/InDesign for print. Fades by size only.';
+    else $('treatDesc').textContent = s.treatment === 'spot' ? '100% "' + T.swatch + '" spot swatch, overprint, drawn on the document\'s spot UV layer (created if missing). Fades by size only.'
+      : 'One "' + T.swatch + '" spot swatch (CMYK ' + T.cmyk.join('/') + ' fallback) on a "' + T.layer + '" layer above the background. Fades by size only.';
+    $('knockSeg').style.opacity = s.autoDetect ? 1 : .5;
+    syncOutputs();
+  }
+  function setSettings(o, keepPanelExtras) { var b = defaults(), k; for (k in o) if (k in b) b[k] = o[k]; st.s = b; syncUI(); }
+
+  // presets
+  function fillPresets(sel) {
+    var ps = $('presetSel'), up = userPresets(); ps.innerHTML = '<option value="">Choose a preset…</option>';
+    var g1 = document.createElement('optgroup'); g1.label = 'NRF27 kit'; Object.keys(BUILTIN).forEach(function (n) { g1.appendChild(opt('b:' + n, n)); }); ps.appendChild(g1);
+    if (Object.keys(up).length) { var g2 = document.createElement('optgroup'); g2.label = 'Saved'; Object.keys(up).sort().forEach(function (n) { g2.appendChild(opt('u:' + n, n)); }); ps.appendChild(g2); }
+    if (sel) ps.value = sel;
+  }
+  function opt(v, t) { var o = document.createElement('option'); o.value = v; o.textContent = t; return o; }
+  $('presetSel').addEventListener('change', function () { var v = this.value; if (!v) return;
+    var p = v.charAt(0) === 'b' ? BUILTIN[v.slice(2)] : userPresets()[v.slice(2)]; if (!p) return;
+    var o = defaults(), k; for (k in p) o[k] = p[k]; o.treatment = st.s.treatment; if (v.charAt(0) === 'u' && p.treatment) o.treatment = p.treatment;
+    setSettings(o); recompute(); status('Preset "' + v.slice(2) + '" loaded', 'ok'); });
+  $('savePreset').addEventListener('click', function () { var n = $('presetName').value.trim(); if (!n) { status('Name the preset first', 'err'); return; }
+    if (n.charAt(0) === '{') {                                  // preset code copied from the web playground
+      try { var code = JSON.parse(n), list = code.presets || [code], upx = userPresets();
+        list.forEach(function (p) { upx[p.name] = p.settings; }); saveUserPresets(upx); fillPresets(); $('presetName').value = '';
+        status('Imported ' + list.length + ' preset' + (list.length > 1 ? 's' : ''), 'ok'); } catch (e) { status('That preset code is not valid', 'err'); }
+      return; }
+    var up = userPresets(); up[n] = JSON.parse(JSON.stringify(st.s)); saveUserPresets(up); fillPresets('u:' + n); $('presetName').value = ''; status('Saved preset "' + n + '"', 'ok'); });
+  $('delPreset').addEventListener('click', function () { var v = $('presetSel').value; if (v.charAt(0) !== 'u') { status('Pick a saved preset to delete', 'err'); return; }
+    var up = userPresets(); delete up[v.slice(2)]; saveUserPresets(up); fillPresets(); status('Deleted', 'ok'); });
+  $('resetAll').addEventListener('click', function () { setSettings(defaults()); st.keep[pageKey()] = []; st.ignore[pageKey()] = {}; recompute(); status('Reset to NRF27 defaults', 'ok'); });
+  function saveLast() { try { store.setItem(LS_LAST, JSON.stringify(st.s)); } catch (e) {} }
+  function loadLast() { try { var o = JSON.parse(store.getItem(LS_LAST)); if (o) setSettings(o); else syncUI(); } catch (e) { syncUI(); } }
+
+  // ---------------------------------------------------------------- actions
+  $('pageSel').addEventListener('change', function () { st.page = +this.value; call('goTo', [st.page]).catch(function () {});
+    st.where = st.info.doc + '|' + st.page; loadPage(); });
+  $('rescan').addEventListener('click', function () { refreshAll(); });
+  $('addSel').addEventListener('click', function () { call('selectionRects', [st.page]).then(function (rs) {
+    rs.forEach(function (r) { keepList().push(r.map(function (v) { return Math.round(v * 10) / 10; })); }); recompute(); status('Added ' + rs.length + ' keep-clear box' + (rs.length > 1 ? 'es' : ''), 'ok');
+  }).catch(function (e) { status(e.message, 'err'); }); });
+  $('clearBoxes').addEventListener('click', function () { st.keep[pageKey()] = []; st.ignore[pageKey()] = {}; recompute(); });
+
+  $('apply').addEventListener('click', function () {
+    if (!st.result || !st.result.dots.length) return;
+    var r = st.result, ig = Object.keys(ignoreSet());
+    var settings = JSON.parse(JSON.stringify(st.s)); settings.keep = keepList(); settings.ignore = ig; settings.v = E.version;
+    var payload = { idx: st.page, dots: r.dots.map(function (d) { return [+d[0].toFixed(3), +d[1].toFixed(3), +d[2].toFixed(4)]; }), treatment: r.treatment, layer: $('layerSel').value, settings: settings };
+    busy(true, 'Drawing ' + r.dots.length + ' dots…');
+    call('apply', [payload]).then(function (res) { busy(false); notice('');
+      status('Drew ' + res.drawn + ' dots on "' + res.layer + '" in ' + res.swatch + '. Undo removes them; Apply again replaces them.', 'ok');
+      return loadInfo().then(function () { $('pageSel').value = String(st.page); });
+    }).catch(function (e) { busy(false); status(e.message, 'err'); });
+  });
+  $('remove').addEventListener('click', function () { busy(true, 'Removing…');
+    call('remove', [st.page]).then(function (res) { busy(false); notice(''); status(res.removed ? 'Removed the dot grid from this page' : 'No dot grid on this page', res.removed ? 'ok' : ''); })
+      .catch(function (e) { busy(false); status(e.message, 'err'); }); });
+
+  // follow the host: document / page switches
+  function poll() {
+    if (!HOSTED || st.busy || drag) return;
+    call('where').then(function (w) {
+      if (w === st.where) return;
+      var doc = w.split('|')[0], prevDoc = st.where.split('|')[0];
+      if (!w) { st.where = ''; return refreshAll(); }
+      if (doc !== prevDoc) return refreshAll();
+      st.where = w; st.page = +w.split('|')[1]; $('pageSel').value = String(st.page); return loadPage();
+    }).catch(function () {});
+  }
+  window.addEventListener('resize', function () { if (st.scan && st.result) draw(); });
+
+  // ---------------------------------------------------------------- boot
+  function boot() {
+  applyTheme();
+  if (CEP && CEP.addEventListener) try { CEP.addEventListener('com.adobe.csxs.events.ThemeColorChanged', applyTheme); } catch (e) {}
+  fillPresets(); loadLast();
+  if (!HOSTED) { $('empty').hidden = false; $('main').hidden = true; $('empty').innerHTML = '<p><b>Open this panel from Illustrator or InDesign</b></p><p>Window › Extensions › NRF27 Dot Grid</p>'; return; }
+  refreshAll().then(function () { setInterval(poll, BR ? 700 : 1500); });
+  }
+  if (BR && BR.ready) BR.ready.then(boot); else boot();
+})();
+
+</script>
+</body>
+</html>

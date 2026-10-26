@@ -8,3 +8,5 @@ test/*.indd
 test/*.png
 test/*.jpg
 test/.*.jsx
+
+site/*.zip

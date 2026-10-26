@@ -1,0 +1,22 @@
+<!doctype html><html><body style="margin:0;background:#eee">
+<!-- Fake Figma host: iframes ../../figma/ui.html and answers its pluginMessages with canned data -->
+<iframe id="f" src="../../figma/ui.html" style="width:320px;height:900px;border:0;background:#fff"></iframe>
+<script>
+const f = document.getElementById('f'); window.applied = null;
+function png() { const c = document.createElement('canvas'); c.width = 900; c.height = 643; const x = c.getContext('2d');
+  x.fillStyle = '#0a0a14'; x.fillRect(0, 0, 900, 643); x.fillStyle = '#f4f2ec'; x.font = 'bold 80px sans-serif'; x.fillText('shopify', 300, 360);
+  return new Promise(r => c.toBlob(b => b.arrayBuffer().then(a => r(new Uint8Array(a))))); }
+const API = {
+  info: () => ({ app: 'figma', doc: 'Test file · Page 1', path: '', pages: [{ i: 0, name: 'Thank-you front', W: 504, H: 360 }], active: 0, layers: [] }),
+  where: () => 'Test file · Page 1|0',
+  scan: () => ({ page: { W: 504, H: 360 }, obstacles: [{ rect: [162.2, 154.3, 341.8, 205.7], pts: [], name: 'Logo', kind: 'GROUP' }], skippedBackgrounds: 1, existing: null, uvOther: 0 }),
+  thumb: async () => ({ __png: await png() }),
+  apply: p => { window.applied = p; return { drawn: p.dots.length, layer: 'Thank-you front', swatch: 'NRF27/Spot UV' }; },
+  remove: () => ({ removed: 1 }), goTo: i => i, selectionRects: () => [[20, 20, 80, 60]]
+};
+window.onmessage = async e => { const m = e.data && e.data.pluginMessage; if (!m || e.source !== f.contentWindow) return;
+  if (m.type === 'store') return;
+  try { const d = await API[m.fn](...(m.args || [])); f.contentWindow.postMessage({ pluginMessage: { id: m.id, ok: true, data: d } }, '*'); }
+  catch (err) { f.contentWindow.postMessage({ pluginMessage: { id: m.id, ok: false, error: err.message } }, '*'); } };
+f.onload = () => f.contentWindow.postMessage({ pluginMessage: { type: 'storage', data: {} } }, '*');
+</script></body></html>

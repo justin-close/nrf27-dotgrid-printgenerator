@@ -1,0 +1,10 @@
+{
+  "name": "NRF27 Dot Grid",
+  "id": "nrf27-dotgrid-print",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": { "allowedDomains": ["none"] }
+}
