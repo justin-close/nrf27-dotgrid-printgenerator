@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionList>
+  <Extension Id="com.shopify.nrf27.dotgrid.panel">
+    <HostList><Host Name="ILST" Port="8098"/><Host Name="IDSN" Port="8099"/></HostList>
+  </Extension>
+</ExtensionList>

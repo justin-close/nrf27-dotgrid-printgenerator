@@ -1,0 +1,72 @@
+# NRF27 Dot Grid: print generator
+
+A panel for **Adobe Illustrator** and **InDesign** that adds the NRF27 dot grid to the page you're working on. It finds your type and logos, keeps them clear, and draws print-ready dots as **Spot UV** or **PMS 9285C**.
+
+**Playground, download and install guide:** https://justin-close.github.io/nrf27-dotgrid-printgenerator/
+
+## Install (macOS)
+
+1. Download the zip, either `nrf27-dotgrid-panel.zip` from the site above or a clone of this repo. If you downloaded the zip, unzip it.
+2. Run the installer:
+   ```bash
+   bash ~/Downloads/nrf27-dotgrid-panel/install.sh
+   ```
+   From a clone, run `bash install.sh`. The installer copies `extension/` into `~/Library/Application Support/Adobe/CEP/extensions/` and sets `PlayerDebugMode` so the unsigned panel can load.
+3. Restart Illustrator or InDesign, then open **Window › Extensions › NRF27 Dot Grid**.
+
+Requirements: Illustrator 2021+ (25.0) or InDesign 2022+ (17.0), with CEP 9 or later.
+
+To uninstall, run `bash install.sh --remove`.
+
+## What it does
+
+- **Reads the active page or artboard.** Text is outlined temporarily to measure exact glyph bounds, then the outlines are deleted. Groups and logos are detected. The tool skips:
+  - full-page backgrounds,
+  - spot UV and varnish layers,
+  - items tagged `dg:ignore`.
+- **Computes the grid in the panel** with [`shared/engine.js`](shared/engine.js):
+  - The lattice scales with the page: u = long side ÷ 1440.
+  - Fade modes:
+    - **Full page:** dots shrink around the content, and the pitch is balanced so the gap is even on all sides.
+    - **Corner or edge:** dots fade out from a corner or edge, up to a reach you set.
+  - Content is knocked out by bounding box or by outline (convex hull), plus any keep-clear boxes you draw.
+  - Dots stay inside the trim margin and never go into the bleed.
+  - The fade works **by size only, never by tint**.
+- **Draws one group named `NRF27 dot grid`** in one of two treatments:
+  - **Spot UV:** 100% `Spot UV` spot swatch (shown as magenta), set to overprint, on the document's spot UV layer. That layer is created if missing.
+  - **Colour:** a `PMS 9285C` spot swatch (CMYK 4/3/7/0 fallback) on a `Dot grid` layer above the background.
+- **Remembers its settings.** They're stored on the group (Illustrator note / InDesign label), so reopening the panel restores them. **Apply** replaces the grid and **Remove** deletes it.
+
+## Repo layout
+
+| Path | What |
+|---|---|
+| `shared/engine.js` | Dot-grid engine (UMD, no dependencies), shared by the panel and the site |
+| `extension/` | CEP panel: `CSXS/manifest.xml`, `index.html`, `panel.js` / `panel.css`, and `host/host.jsx` (ExtendScript for both apps) |
+| `site/` | Static site: landing page, install guide, playground and SVG export. Published to GitHub Pages from the `gh-pages` branch |
+| `install.sh` | Installer; `--dev` symlinks instead of copying, `--remove` uninstalls |
+| `build.sh` | Copies the engine into `extension/` and `site/` and zips the panel into `site/`. `bash build.sh pages` publishes the site |
+| `test/` | Dev harness (see below) |
+
+## Engine API
+
+```js
+const r = DotGrid.compute(
+  { W: 504, H: 360 },                          // page size in pt
+  [{ rect: [162, 154, 342, 206] }],            // obstacles: [l, t, r, b] in pt, origin top-left, y down
+  { mode: 'page', treatment: 'spot' }          // settings (see DotGrid.DEFAULTS)
+);
+r.dots   // [[x, y, radius], ...] in pt
+r.gaps   // { l, r, t, b } gap from the main content to the nearest dots
+```
+
+Settings: `mode` (`page` | `corner` | `edge`), `anchor`, `reach`, `density`, `size`, `minDot`, `softness`, `clearance` (`null` means auto), `knock` (`rect` | `shape`), `margin`, `balance`, `treatment` (`spot` | `color`).
+
+## Development
+
+- **Live panel:** `bash install.sh --dev` symlinks `extension/` into the CEP folder. Edit, then close and reopen the panel. Remote debugging runs at `http://localhost:8098` (Illustrator) and `http://localhost:8099` (InDesign).
+- **Without restarting the app:** `node test/devserver.js ai` (or `id`) serves the panel at http://localhost:8765. It uses a mock `__adobe_cep__` that runs `host.jsx` in the running app through `osascript`. Open it in a 320px-wide browser window.
+- **Host calls:** `test/run.sh ai 'DG.scan(0,{shape:true})'` evaluates a host call directly.
+- **Full pipeline:** `node test/e2e.js ai 0 '{"mode":"corner","anchor":"br"}'` runs scan → compute → apply.
+
+To publish the site, run `bash build.sh pages`. It builds `site/`, including the zip, and force-pushes it to the `gh-pages` branch.

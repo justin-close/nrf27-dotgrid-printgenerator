@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>NRF27 Dot Grid</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div id="app">
+    <header class="top">
+      <div class="doc-row">
+        <span id="appBadge" class="badge">—</span>
+        <span id="docName" class="doc-name">No document</span>
+        <button id="rescan" class="icon-btn" title="Rescan the page">
+          <svg viewBox="0 0 16 16" width="14" height="14"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M12.6 1.6v3.2H9.4" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+        </button>
+      </div>
+      <select id="pageSel" aria-label="Page or artboard"></select>
+    </header>
+
+    <div id="empty" class="empty" hidden>
+      <p><b>Open an Illustrator or InDesign document</b></p>
+      <p>The panel reads the active page, finds the type and logos, and draws the NRF27 dot grid around them.</p>
+    </div>
+
+    <main id="main">
+      <section class="preview">
+        <div class="pv-wrap"><canvas id="pv"></canvas><div id="pvBusy" class="pv-busy" hidden>Reading page…</div></div>
+        <p class="hint">Drag on the preview to add a keep-clear box. Click detected content to ignore it, or a box to delete it.</p>
+        <div id="readout" class="readout"></div>
+        <div id="warn" class="warn" hidden></div>
+        <div id="notice" class="notice" hidden></div>
+      </section>
+
+      <section class="sec">
+        <h2>Fade</h2>
+        <div class="fade-row">
+          <div id="anchorGrid" class="anchor-grid" role="radiogroup" aria-label="Fade from">
+            <button data-a="tl" title="Top-left corner"></button><button data-a="t" class="edge" title="Top edge"></button><button data-a="tr" title="Top-right corner"></button>
+            <button data-a="l" class="edge" title="Left edge"></button><button data-a="page" class="page" title="Full page, receding around content"></button><button data-a="r" class="edge" title="Right edge"></button>
+            <button data-a="bl" title="Bottom-left corner"></button><button data-a="b" class="edge" title="Bottom edge"></button><button data-a="br" title="Bottom-right corner"></button>
+          </div>
+          <div class="fade-desc"><b id="fadeTitle">Full page</b><span id="fadeSub">Dots cover the page and shrink around the content.</span></div>
+        </div>
+        <label class="slider" data-show="corner edge"><span>Reach</span><input id="reach" type="range" min="15" max="150" step="1"><output id="reachOut"></output></label>
+        <label class="slider" data-show="page"><span>Softness</span><input id="softness" type="range" min="1" max="8" step="0.25"><output id="softnessOut"></output></label>
+        <label class="slider"><span>Smallest dot</span><input id="minDot" type="range" min="10" max="100" step="1"><output id="minDotOut"></output></label>
+        <label class="check" data-show="page"><input id="balance" type="checkbox"><span>Even gap around the main content</span></label>
+      </section>
+
+      <section class="sec">
+        <h2>Treatment</h2>
+        <div class="seg" id="treatSeg"><button data-v="spot">Spot UV</button><button data-v="color">Colour</button></div>
+        <p class="desc" id="treatDesc"></p>
+        <label class="field"><span>Layer</span><select id="layerSel"></select></label>
+      </section>
+
+      <section class="sec">
+        <h2>Grid</h2>
+        <label class="slider"><span>Density</span><input id="density" type="range" min="50" max="200" step="1"><output id="densityOut"></output></label>
+        <label class="slider"><span>Dot size</span><input id="size" type="range" min="50" max="200" step="1"><output id="sizeOut"></output></label>
+        <p class="desc" id="gridDesc"></p>
+      </section>
+
+      <section class="sec">
+        <h2>Keep clear</h2>
+        <label class="check"><input id="autoDetect" type="checkbox"><span>Avoid content automatically</span></label>
+        <div class="field"><span>Knock out</span><div class="seg small" id="knockSeg"><button data-v="rect">Bounds</button><button data-v="shape">Shape</button></div></div>
+        <label class="slider"><span>Clearance</span><input id="clearance" type="range" min="0" max="36" step="0.5"><output id="clearanceOut"></output></label>
+        <label class="check"><input id="clearAuto" type="checkbox"><span>Auto clearance (scales with the page)</span></label>
+        <div class="btn-row">
+          <button id="addSel" class="btn">Add selection</button>
+          <button id="clearBoxes" class="btn quiet">Clear boxes</button>
+        </div>
+        <p class="desc" id="keepDesc"></p>
+      </section>
+
+      <details class="sec adv">
+        <summary><h2>Advanced</h2></summary>
+        <label class="slider"><span>Trim margin</span><input id="margin" type="range" min="0" max="18" step="0.5"><output id="marginOut"></output></label>
+        <div class="field"><span>Preset</span><select id="presetSel"></select></div>
+        <div class="btn-row">
+          <input id="presetName" type="text" placeholder="Preset name, or paste a preset code">
+          <button id="savePreset" class="btn">Save</button>
+          <button id="delPreset" class="btn quiet" title="Delete the selected saved preset">Delete</button>
+        </div>
+        <button id="resetAll" class="btn quiet block">Reset to NRF27 defaults</button>
+      </details>
+    </main>
+
+    <footer class="bottom">
+      <div class="btn-row">
+        <button id="apply" class="btn primary">Apply to page</button>
+        <button id="remove" class="btn quiet" title="Remove the dot grid from this page">Remove</button>
+      </div>
+      <div id="status" class="status" aria-live="polite"></div>
+    </footer>
+  </div>
+  <script src="engine.js"></script>
+  <script src="panel.js"></script>
+</body>
+</html>

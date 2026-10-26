@@ -1,0 +1,10 @@
+.DS_Store
+# build outputs (made by build.sh / the Pages workflow)
+site/engine.js
+site/*.zip
+# local test documents and scratch files
+test/*.ai
+test/*.indd
+test/*.png
+test/*.jpg
+test/.*.jsx
