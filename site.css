@@ -1,0 +1,70 @@
+:root { --ink: #0a0a0f; --paper: #f4f2ec; --line: #dcd8cf; --dim: #6b675f; --accent: #e6007e; --card: #fff; --r: 10px; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Inter", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; background: #ece8df; padding: 1px 5px; border-radius: 4px; }
+h1, h2, h3 { letter-spacing: -0.01em; margin: 0 0 .4em; }
+h2 { font-size: 22px; } h3 { font-size: 15px; }
+.small { font-size: 13px; color: var(--dim); }
+
+.hero { background: var(--ink) radial-gradient(circle, rgba(230,0,126,.55) 1.3px, transparent 1.6px) 0 0 / 22px 22px; color: #fff; padding: 72px 0 64px; position: relative; }
+.hero::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 70% at 30% 50%, var(--ink) 35%, transparent 75%); pointer-events: none; }
+.hero .wrap { position: relative; z-index: 1; }
+.eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; color: #ff6bbd; margin: 0 0 10px; }
+.hero h1 { font-size: 48px; line-height: 1.05; max-width: 640px; }
+.lede { max-width: 600px; font-size: 17px; color: #d6d6dc; }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 24px; }
+
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: #fff; color: var(--ink);
+  font: 600 14px/1 inherit; text-decoration: none; cursor: pointer; }
+.hero .btn { background: transparent; color: #fff; border-color: rgba(255,255,255,.35); }
+.btn.primary, .hero .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn:hover { filter: brightness(1.06); }
+.btn.small { height: 30px; padding: 0 11px; font-size: 13px; border-radius: 6px; }
+.btn.quiet { background: transparent; color: var(--dim); }
+.ver { font-weight: 400; opacity: .8; font-size: 12px; }
+
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 28px; margin: 24px 0; }
+.steps { padding-left: 20px; margin: 0 0 12px; } .steps li { margin: 0 0 12px; }
+.code { display: flex; align-items: center; gap: 8px; background: var(--ink); color: #fff; border-radius: 8px; padding: 10px 12px; margin: 8px 0; }
+.code code { background: none; color: #fff; flex: 1; overflow-x: auto; white-space: nowrap; }
+.copy { background: #2a2a33; color: #fff; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; font: 600 12px inherit; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 22px; }
+.cols p { margin: 0; font-size: 14px; color: #3a3833; }
+
+/* playground */
+.play-grid { display: grid; grid-template-columns: 1fr 320px; gap: 24px; margin-top: 12px; }
+@media (max-width: 900px) { .play-grid { grid-template-columns: 1fr; } }
+.stage-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 8px 0; }
+.stage-bar select { height: 30px; }
+.wh { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.wh input[type=number] { width: 68px; }
+.spacer { flex: 1; }
+.file { position: relative; }
+.cv-wrap { background: #e9e6de; border-radius: 8px; padding: 20px; display: grid; place-items: center; min-height: 360px; }
+#cv { max-width: 100%; cursor: crosshair; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+.readout { color: var(--ink); font-variant-numeric: tabular-nums; margin-left: 6px; }
+.controls fieldset { border: 0; border-top: 1px solid var(--line); margin: 0 0 6px; padding: 12px 0 6px; display: grid; gap: 9px; }
+.controls legend { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 0; }
+.sl { display: grid; grid-template-columns: 92px 1fr 54px; gap: 8px; align-items: center; font-size: 13px; }
+.sl output { text-align: right; font-variant-numeric: tabular-nums; }
+.sl input { accent-color: var(--accent); width: 100%; }
+.ck { font-size: 13px; display: flex; gap: 6px; align-items: center; } .ck input { accent-color: var(--accent); }
+.row { display: flex; gap: 6px; } .row input { flex: 1; min-width: 0; }
+select, input[type=text], input[type=number] { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 13px; background: #fff; height: 30px; width: 100%; }
+.stage-bar select { width: auto; }
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-left: 1px solid var(--line); background: #fff; height: 32px; font: 600 13px inherit; cursor: pointer; color: var(--dim); }
+.seg button:first-child { border-left: 0; }
+.seg button.on { background: var(--ink); color: #fff; }
+.fade-row { display: flex; gap: 12px; align-items: center; font-size: 14px; }
+.anchor-grid { display: grid; grid-template-columns: repeat(3, 26px); grid-template-rows: repeat(3, 26px); gap: 3px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; flex: none; }
+.anchor-grid button { border: 1px solid var(--line); border-radius: 4px; background: #faf9f6; cursor: pointer; position: relative; padding: 0; }
+.anchor-grid button::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 7px; height: 7px; border-radius: 50%; background: #b7b2a7; }
+.anchor-grid button.edge::after { width: 12px; height: 3px; border-radius: 2px; }
+.anchor-grid button[data-a=l]::after, .anchor-grid button[data-a=r]::after { width: 3px; height: 12px; }
+.anchor-grid button.page::after { width: 13px; height: 13px; border-radius: 2px; background: none; border: 1.5px dotted #b7b2a7; }
+.anchor-grid button.on { border-color: var(--accent); background: #fde6f2; }
+.anchor-grid button.on::after { background: var(--accent); } .anchor-grid button.page.on::after { background: none; border-color: var(--accent); }
+[hidden] { display: none !important; }
+.foot { padding: 12px 24px 40px; }

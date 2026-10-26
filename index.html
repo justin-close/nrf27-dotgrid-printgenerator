@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NRF27 Dot Grid · Print generator</title>
+  <link rel="stylesheet" href="site.css">
+  <script>if (/\.quick\.shopify\.io$/.test(location.hostname)) document.write('<script src="/client/quick.js"><\/script>');</script>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">NRF27 · Print kit tool</p>
+      <h1>Dot grid print generator</h1>
+      <p class="lede">A panel for <b>Illustrator</b>, <b>InDesign</b> and <b>Figma</b> that puts the NRF27 dot grid on the page you're working on. It finds your type and logos, keeps them clear, and draws print-ready dots in Spot UV or PMS 9285C.</p>
+      <div class="cta">
+        <a class="btn primary" href="nrf27-dotgrid-panel.zip" download>Adobe panel <span class="ver" id="ver"></span></a>
+        <a class="btn primary" href="nrf27-dotgrid-figma.zip" download>Figma plugin</a>
+        <a class="btn" href="#install">How to install</a>
+        <a class="btn" href="#play">Try it in the browser</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="install" class="card">
+      <h2>Install (macOS, about a minute)</h2>
+      <ol class="steps">
+        <li><b>Download</b> the zip above and double-click it to unzip. You get a folder called <code>nrf27-dotgrid-panel</code> in Downloads.</li>
+        <li><b>Open Terminal</b> and paste this line, then press Return:
+          <div class="code"><code id="cmd">bash ~/Downloads/nrf27-dotgrid-panel/install.sh</code><button class="copy" data-copy="cmd">Copy</button></div>
+          It copies the panel into your Adobe extensions folder and allows unsigned panels to load.</li>
+        <li><b>Quit and reopen</b> Illustrator or InDesign.</li>
+        <li>Open the panel from <b>Window › Extensions › NRF27 Dot Grid</b>.</li>
+      </ol>
+      <p class="small">Needs Illustrator 2021+ or InDesign 2022+. To uninstall: <code>bash ~/Downloads/nrf27-dotgrid-panel/install.sh --remove</code></p>
+    </section>
+
+    <section id="figma" class="card">
+      <h2>Figma plugin</h2>
+      <ol class="steps">
+        <li><b>Download</b> the Figma plugin zip above and unzip it (folder <code>nrf27-dotgrid-figma</code>).</li>
+        <li>In the Figma desktop app: <b>Plugins › Development › Import plugin from manifest…</b> and pick <code>manifest.json</code> in that folder.</li>
+        <li>Run it from <b>Plugins › Development › NRF27 Dot Grid</b>. It works on the selected top-level frame.</li>
+      </ol>
+      <p class="small">Same engine and controls as the Adobe panel. Dots are drawn as one vector layer, <code>NRF27 dot grid</code>, always filled with <b>#F6F5EF</b> (colour style <code>NRF27/Dot grid</code>), with no treatment to choose. Figma has no spot colours or overprint, so it's for layouts, comps and screens. Use the Adobe panel for Spot UV / PMS 9285C print files. Name any layer “keep clear” to reserve space, or put <code>dg:ignore</code> in a layer name to skip it.</p>
+    </section>
+
+    <section class="card">
+      <h2>Using the panel</h2>
+      <div class="cols">
+        <div>
+          <h3>1 · Pick the page</h3>
+          <p>The panel follows the active artboard or page. It reads the content, ignores full-bleed backgrounds and the spot UV layer, and shows a live preview.</p>
+        </div>
+        <div>
+          <h3>2 · Choose the fade</h3>
+          <p><b>Full page</b>: dots everywhere, shrinking around the content, with an even gap all round. <b>Corner / edge</b>: dots start at a corner or edge and fade out by the reach.</p>
+        </div>
+        <div>
+          <h3>3 · Keep things clear</h3>
+          <p>Content is avoided automatically. Drag on the preview to add a keep-clear box, click a detected item to ignore it, or use <b>Add selection</b>.</p>
+        </div>
+        <div>
+          <h3>4 · Apply</h3>
+          <p><b>Spot UV</b>: 100% "Spot UV" spot swatch on the spot UV layer, set to overprint. <b>Colour</b>: "PMS 9285C" spot swatch. Either way, dots fade by size, never by tint. Apply again to replace.</p>
+        </div>
+      </div>
+      <p class="small">The grid scales with the page (u = long side ÷ 1440, as on the NRF27 landing page). Dots stay inside the trim, never in the bleed. Settings are saved on the grid, so reopening the panel restores them.</p>
+    </section>
+
+    <section id="play" class="card play">
+      <div class="play-head">
+        <h2>Playground</h2>
+        <p class="small">Try settings on a blank page or a reference image, then share them as a preset. Draw boxes where your content will go.</p>
+      </div>
+      <div class="play-grid">
+        <div class="stage">
+          <div class="stage-bar">
+            <select id="sizeSel"></select>
+            <span class="wh"><input id="wIn" type="number" step="0.125" min="1"> × <input id="hIn" type="number" step="0.125" min="1"> in</span>
+            <label class="btn small file">Reference image<input id="refIn" type="file" accept="image/*" hidden></label>
+            <button id="clearRef" class="btn small quiet">No image</button>
+          </div>
+          <div class="cv-wrap"><canvas id="cv"></canvas></div>
+          <p class="small">Drag to draw a content box. Click a box to delete it. <span id="readout" class="readout"></span></p>
+          <div class="stage-bar">
+            <button id="sample" class="btn small">Sample content</button>
+            <button id="clearBoxes" class="btn small quiet">Clear boxes</button>
+            <span class="spacer"></span>
+            <button id="svgOut" class="btn small">Download SVG</button>
+          </div>
+        </div>
+        <div class="controls">
+          <fieldset>
+            <legend>Fade</legend>
+            <div class="fade-row">
+              <div id="anchorGrid" class="anchor-grid">
+                <button data-a="tl"></button><button data-a="t" class="edge"></button><button data-a="tr"></button>
+                <button data-a="l" class="edge"></button><button data-a="page" class="page"></button><button data-a="r" class="edge"></button>
+                <button data-a="bl"></button><button data-a="b" class="edge"></button><button data-a="br"></button>
+              </div>
+              <div><b id="fadeTitle"></b><div class="small" id="fadeSub"></div></div>
+            </div>
+            <label class="sl" data-show="corner edge"><span>Reach</span><input id="reach" type="range" min="15" max="150"><output></output></label>
+            <label class="sl" data-show="page"><span>Softness</span><input id="softness" type="range" min="1" max="8" step="0.25"><output></output></label>
+            <label class="sl"><span>Smallest dot</span><input id="minDot" type="range" min="10" max="100"><output></output></label>
+            <label class="ck" data-show="page"><input id="balance" type="checkbox"> Even gap around the main content</label>
+          </fieldset>
+          <fieldset>
+            <legend>Treatment</legend>
+            <div class="seg" id="treatSeg"><button data-v="spot">Spot UV</button><button data-v="color">PMS 9285C</button></div>
+          </fieldset>
+          <fieldset>
+            <legend>Grid</legend>
+            <label class="sl"><span>Density</span><input id="density" type="range" min="50" max="200"><output></output></label>
+            <label class="sl"><span>Dot size</span><input id="size" type="range" min="50" max="200"><output></output></label>
+            <label class="sl"><span>Clearance</span><input id="clearance" type="range" min="0" max="36" step="0.5"><output></output></label>
+            <label class="ck"><input id="clearAuto" type="checkbox"> Auto clearance</label>
+            <label class="sl"><span>Trim margin</span><input id="margin" type="range" min="0" max="18" step="0.5"><output></output></label>
+          </fieldset>
+          <fieldset>
+            <legend>Shared presets</legend>
+            <select id="presetSel"></select>
+            <div class="row"><input id="presetName" type="text" placeholder="Name, e.g. Postcard · corner"><button id="savePreset" class="btn small">Share</button></div>
+            <div class="row"><button id="copyCode" class="btn small">Copy for panel</button><button id="copyAll" class="btn small quiet">Copy all shared</button><button id="delPreset" class="btn small quiet">Delete</button></div>
+            <p class="small">To use a preset in the panel, paste the code into <b>Advanced › Preset name</b> and press <b>Save</b>.</p>
+            <p class="small" id="presetMsg"></p>
+          </fieldset>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="wrap foot small">NRF27 dot grid engine <span id="ver2"></span> · Same engine as the panel · <a href="https://github.com/justin-close/nrf27-dotgrid-printgenerator">Source on GitHub</a></footer>
+  <script src="engine.js"></script>
+  <script src="site.js"></script>
+</body>
+</html>
