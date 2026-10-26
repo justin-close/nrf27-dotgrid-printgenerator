@@ -25,8 +25,8 @@ To uninstall, run `bash install.sh --remove`.
 3. Run **Plugins › Development › NRF27 Dot Grid**. It works on the selected top-level frame (frames inside sections count too).
 
 It has the same UI and engine as the Adobe panel, with these differences:
-- **Output:** one vector layer named `NRF27 dot grid`, filled with the local colour style `NRF27/Spot UV` (M100 preview) or `NRF27/PMS 9285C`. Constraints are set to Scale.
-- **Not for print:** Figma has no spot colours or overprint, so use the plugin for layouts and comps. Make print files with the Adobe panel.
+- **Output:** one vector layer named `NRF27 dot grid`, filled with **#F6F5EF** through the local colour style `NRF27/Dot grid`. There's no Spot UV / PMS choice in Figma. It sits just above the frame's background, and its constraints are set to Scale.
+- **Not for print:** Figma has no spot colours or overprint, so use the plugin for layouts, comps and screens. Make print files (Spot UV / PMS 9285C) with the Adobe panel.
 - **Layer names:** name a layer `keep clear` to reserve space, add `dg:ignore` to a name to skip it, and layers named like `Spot UV` are left out of detection.
 - **Units:** 1 px is treated as 1 pt, so a 504×360 frame matches a 7×5 in card.
 

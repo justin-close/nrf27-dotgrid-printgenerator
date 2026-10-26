@@ -5,11 +5,8 @@
  */
 var GROUP = 'NRF27 dot grid', UV_RE = /spot\s*uv|clear\s*(spot|uv)|varnish/i, KEEP_RE = /keep[\s_-]*clear/i;
 var BG_FRAC = 0.85, WRAP_FRAC = 0.35, MAXPTS = 1500, STORE_KEYS = ['nrf27-dotgrid.presets', 'nrf27-dotgrid.last'];
-var STYLE = { spot: 'NRF27/Spot UV', color: 'NRF27/PMS 9285C' };
-var STYLE_DESC = {
-  spot: 'NRF27 dot grid: Spot UV varnish plate. In print = 100% "Spot UV" spot swatch, overprint. Preview shown as M100.',
-  color: 'NRF27 dot grid: PMS 9285C spot (CMYK 4/3/7/0 fallback).'
-};
+var DOT_HEX = '#F6F5EF', STYLE = 'NRF27/Dot grid';                 // Figma: one fixed colour, no Spot UV / PMS choice
+var STYLE_DESC = 'NRF27 dot grid colour (#F6F5EF). Used by the NRF27 Dot Grid plugin.';
 var activeId = null;
 function PAGE() { return (typeof __DG_PAGE__ !== 'undefined' && __DG_PAGE__) || figma.currentPage; }   // tests target a scratch page
 
@@ -161,9 +158,9 @@ var API = {
   },
 
   apply: function (p) {
-    var f = frameAt(p.idx), T = p.treatment, kind = T.overprint ? 'spot' : 'color';
+    var f = frameAt(p.idx);
     removeIn(f);
-    return ensureStyle(kind, T).then(function (style) {
+    return ensureStyle().then(function (style) {
       var dots = p.dots; if (!dots.length) throw new Error('No dots to draw');
       var minX = Infinity, minY = Infinity, K = 0.5522847498, d = [];
       dots.forEach(function (q) { minX = Math.min(minX, q[0] - q[2]); minY = Math.min(minY, q[1] - q[2]); });
@@ -175,12 +172,12 @@ var API = {
           ' C ' + n4(x + k) + ' ' + n4(y - r) + ' ' + n4(x + r) + ' ' + n4(y - k) + ' ' + n4(x + r) + ' ' + n4(y) + ' Z');
       });
       var v = figma.createVector();
-      if (kind === 'spot') f.appendChild(v); else f.insertChild(backgroundIndex(f), v);
+      f.insertChild(backgroundIndex(f), v);                          // just above the full-frame background(s)
       if (f.layoutMode && f.layoutMode !== 'NONE') v.layoutPositioning = 'ABSOLUTE';
       v.vectorPaths = [{ windingRule: 'NONZERO', data: d.join(' ') }];
       v.x = minX; v.y = minY;                                        // paths are origin-relative, so place explicitly
       v.name = GROUP; v.strokes = []; v.constraints = { horizontal: 'SCALE', vertical: 'SCALE' };
-      v.setPluginData('dg', JSON.stringify(p.settings)); v.setPluginData('treatment', kind);
+      v.setPluginData('dg', JSON.stringify(p.settings)); v.setPluginData('color', DOT_HEX);
       return v.setFillStyleIdAsync(style.id).then(function () {
         figma.commitUndo();
         return { drawn: dots.length, layer: f.name, swatch: style.name };
@@ -205,11 +202,15 @@ function backgroundIndex(f) {                                         // colour 
   return idx;
 }
 function hexToRgb(h) { h = h.replace('#', ''); return { r: parseInt(h.substr(0, 2), 16) / 255, g: parseInt(h.substr(2, 2), 16) / 255, b: parseInt(h.substr(4, 2), 16) / 255 }; }
-function ensureStyle(kind, T) {
+function ensureStyle() {
+  var want = hexToRgb(DOT_HEX);
   return figma.getLocalPaintStylesAsync().then(function (styles) {
-    for (var i = 0; i < styles.length; i++) if (styles[i].name === STYLE[kind]) return styles[i];
-    var s = figma.createPaintStyle(); s.name = STYLE[kind]; s.description = STYLE_DESC[kind];
-    s.paints = [{ type: 'SOLID', color: hexToRgb(kind === 'spot' ? '#ec008c' : T.display) }];
+    var s = null;
+    for (var i = 0; i < styles.length; i++) if (styles[i].name === STYLE) { s = styles[i]; break; }
+    if (!s) { s = figma.createPaintStyle(); s.name = STYLE; }
+    s.description = STYLE_DESC;
+    var p = s.paints[0], c = p && p.type === 'SOLID' && p.color;     // keep the style locked to #F6F5EF
+    if (!c || Math.abs(c.r - want.r) + Math.abs(c.g - want.g) + Math.abs(c.b - want.b) > 0.002 || (p.opacity != null && p.opacity !== 1)) s.paints = [{ type: 'SOLID', color: want }];
     return s;
   });
 }

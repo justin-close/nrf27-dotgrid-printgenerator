@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   var E = window.DotGrid, $ = function (id) { return document.getElementById(id); };
-  var CEP = window.__adobe_cep__ || null, BR = window.DGBridge || null, HOSTED = !!(CEP || BR);
+  var CEP = window.__adobe_cep__ || null, FIGMA_DOT = '#F6F5EF', BR = window.DGBridge || null, HOSTED = !!(CEP || BR);
   var store = (BR && BR.storage) || { getItem: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, setItem: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
   var LS_PRESETS = 'nrf27-dotgrid.presets', LS_LAST = 'nrf27-dotgrid.last';
 
@@ -85,7 +85,7 @@
       if (!st.info && info.app === 'figma') $('empty').innerHTML = '<p><b>Add or select a frame</b></p><p>The plugin works on one top-level frame at a time. It reads the frame\'s content and draws the NRF27 dot grid around it.</p>';
       $('empty').hidden = !!st.info; $('main').hidden = !st.info; document.querySelector('.bottom').hidden = !st.info;
       $('appBadge').textContent = { indesign: 'Id', figma: 'Fg' }[info.app] || 'Ai'; $('appBadge').className = 'badge' + ({ indesign: ' id', figma: ' fg' }[info.app] || '');
-      document.querySelector('#layerSel').closest('.field').hidden = info.app === 'figma'; syncUI();
+      document.querySelector('#treatSeg').closest('.sec').hidden = info.app === 'figma'; syncUI();   // Figma: one colour, no treatment choice
       $('apply').textContent = info.app === 'figma' ? 'Apply to frame' : 'Apply to page'; $('remove').title = 'Remove the dot grid from this ' + (info.app === 'figma' ? 'frame' : 'page');
       if (!st.info) { $('docName').textContent = 'No document'; st.where = ''; return false; }
       $('docName').textContent = info.doc; $('docName').title = info.path || info.doc;
@@ -151,8 +151,8 @@
     c.fillStyle = '#fff'; c.fillRect(0, 0, w, h);
     if (st.img) c.drawImage(st.img, 0, 0, w, h);
     c.save(); c.scale(k, k);
-    var T = E.TREATMENTS[st.s.treatment], light = st.s.treatment === 'color';
-    c.fillStyle = T.display; c.globalAlpha = light ? 1 : 0.9;
+    var T = E.TREATMENTS[st.s.treatment], light = st.s.treatment === 'color' || st.app === 'figma';
+    c.fillStyle = st.app === 'figma' ? FIGMA_DOT : T.display; c.globalAlpha = light ? 1 : 0.9;
     c.beginPath(); st.result.dots.forEach(function (d) { c.moveTo(d[0] + d[2], d[1]); c.arc(d[0], d[1], d[2], 0, Math.PI * 2); }); c.fill();
     if (light) { c.globalAlpha = 0.45; c.lineWidth = 0.6 / k; c.strokeStyle = '#6b665c'; c.stroke(); }
     c.globalAlpha = 1;
@@ -248,8 +248,7 @@
     document.querySelectorAll('#treatSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === s.treatment); });
     document.querySelectorAll('#knockSeg button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === s.knock); });
     var T = E.TREATMENTS[s.treatment];
-    if (st.app === 'figma') $('treatDesc').textContent = (s.treatment === 'spot' ? 'Fills with the "NRF27/Spot UV" colour style (M100 preview of the varnish plate).' : 'Fills with the "NRF27/PMS 9285C" colour style (CMYK 4/3/7/0 preview).') + ' Figma has no spot colours or overprint, so assign the swatch in Illustrator/InDesign for print. Fades by size only.';
-    else $('treatDesc').textContent = s.treatment === 'spot' ? '100% "' + T.swatch + '" spot swatch, overprint, drawn on the document\'s spot UV layer (created if missing). Fades by size only.'
+    if (st.app !== 'figma') $('treatDesc').textContent = s.treatment === 'spot' ? '100% "' + T.swatch + '" spot swatch, overprint, drawn on the document\'s spot UV layer (created if missing). Fades by size only.'
       : 'One "' + T.swatch + '" spot swatch (CMYK ' + T.cmyk.join('/') + ' fallback) on a "' + T.layer + '" layer above the background. Fades by size only.';
     $('knockSeg').style.opacity = s.autoDetect ? 1 : .5;
     syncOutputs();
