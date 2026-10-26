@@ -21,7 +21,7 @@ To uninstall, run `bash install.sh --remove`.
 ## Figma plugin
 
 1. Download `nrf27-dotgrid-figma.zip` from the site and unzip it, or use the `figma/` folder of a clone.
-2. In the Figma desktop app, go to **Plugins › Development › Import plugin from manifest…** and pick `figma/manifest.json`.
+2. In the Figma desktop app, go to **Plugins › Development › Import plugin from manifest…** and pick `figma/manifest.json`. Or, from a clone, run `bash figma/install.sh`. It quits Figma, registers the plugin in Figma's settings (keeping a backup), and reopens Figma.
 3. Run **Plugins › Development › NRF27 Dot Grid**. It works on the selected top-level frame (frames inside sections count too).
 
 It has the same UI and engine as the Adobe panel, with these differences:
