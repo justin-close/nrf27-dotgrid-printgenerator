@@ -11,6 +11,7 @@ var STYLE_DESC = {
   color: 'NRF27 dot grid: PMS 9285C spot (CMYK 4/3/7/0 fallback).'
 };
 var activeId = null;
+function PAGE() { return (typeof __DG_PAGE__ !== 'undefined' && __DG_PAGE__) || figma.currentPage; }   // tests target a scratch page
 
 var TEST = typeof __DG_TEST__ !== 'undefined';                     // test/figma/run.sh evaluates this file via the Labor bridge
 if (!TEST) figma.showUI(__html__, { width: 320, height: 760, themeColors: true, title: 'NRF27 Dot Grid' });
@@ -22,7 +23,7 @@ function frames() {
     for (var i = 0; i < n.children.length; i++) { var c = n.children[i];
       if (c.type === 'SECTION') walk(c);
       else if ((c.type === 'FRAME' || c.type === 'COMPONENT') && c.visible) out.push(c); }
-  })(figma.currentPage);
+  })(PAGE());
   out.sort(function (a, b) { var A = a.absoluteTransform, B = b.absoluteTransform; return (A[1][2] - B[1][2]) || (A[0][2] - B[0][2]); });
   return out;
 }
@@ -31,14 +32,14 @@ function topFrameOf(n) {
   return n && (n.type === 'FRAME' || n.type === 'COMPONENT') ? n : null;
 }
 function activeIndex(fs) {
-  var sel = figma.currentPage.selection, f = sel.length ? topFrameOf(sel[0]) : null;
+  var sel = PAGE().selection, f = sel.length ? topFrameOf(sel[0]) : null;
   if (f) activeId = f.id;
   for (var i = 0; i < fs.length; i++) if (fs[i].id === activeId) return i;
   if (fs.length) { activeId = fs[0].id; return 0; }
   return -1;
 }
 function frameAt(idx) { var f = frames()[idx]; if (!f) throw new Error('That frame no longer exists. Rescan.'); return f; }
-function docName() { return figma.root.name + ' · ' + figma.currentPage.name; }
+function docName() { return figma.root.name + ' · ' + PAGE().name; }
 
 // ------------------------------------------------------------------ geometry helpers
 function origin(f) { var t = f.absoluteTransform; return [t[0][2], t[1][2]]; }
@@ -73,6 +74,39 @@ function collectPts(n, o, pts) {
     for (var i = 0; i < n.children.length; i++) collectPts(n.children[i], o, pts);
   } else geomPts(n, o, pts);
 }
+// Text → one obstacle per visual line, from the glyph outlines (a 4-line headline shouldn't blank the whole frame)
+function textLines(n, o) {
+  var gs; try { gs = n.fillGeometry; } catch (e) { return null; }
+  if (!gs || !gs.length) return null;
+  var t = n.absoluteTransform, boxes = [];
+  if (Math.abs(t[0][1]) > 1e-3 || Math.abs(t[1][0]) > 1e-3) return null;   // rotated/skewed text: keep as one shape
+  for (var g = 0; g < gs.length; g++) {
+    var subs = gs[g].data.split(/(?=M)/);
+    for (var k = 0; k < subs.length; k++) {
+      var nums = subs[k].match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi) || [], pts = [];
+      for (var j = 0; j + 1 < nums.length; j += 2) { var x = +nums[j], y = +nums[j + 1];
+        pts.push([t[0][0] * x + t[0][1] * y + t[0][2] - o[0], t[1][0] * x + t[1][1] * y + t[1][2] - o[1]]); }
+      if (!pts.length) continue;
+      var b = [Infinity, Infinity, -Infinity, -Infinity];
+      pts.forEach(function (q) { b[0] = Math.min(b[0], q[0]); b[1] = Math.min(b[1], q[1]); b[2] = Math.max(b[2], q[0]); b[3] = Math.max(b[3], q[1]); });
+      boxes.push({ r: b, pts: pts });
+    }
+  }
+  if (!boxes.length) return null;
+  boxes.sort(function (a, b) { return a.r[1] - b.r[1]; });
+  var lines = [];
+  boxes.forEach(function (bx) {                                       // merge glyphs whose vertical ranges overlap into one line
+    var L = null;
+    for (var i = 0; i < lines.length; i++) { var lr = lines[i].r; if (bx.r[1] < lr[3] && bx.r[3] > lr[1]) { L = lines[i]; break; } }
+    if (!L) { lines.push({ r: bx.r.slice(), pts: bx.pts.slice() }); return; }
+    L.r = [Math.min(L.r[0], bx.r[0]), Math.min(L.r[1], bx.r[1]), Math.max(L.r[2], bx.r[2]), Math.max(L.r[3], bx.r[3])]; L.pts = L.pts.concat(bx.pts);
+  });
+  for (var a = 0; a < lines.length; a++) for (var b2 = lines.length - 1; b2 > a; b2--) {   // a merge can make two lines overlap: fold again
+    var A = lines[a].r, B = lines[b2].r;
+    if (B[1] < A[3] && B[3] > A[1]) { lines[a].r = [Math.min(A[0], B[0]), Math.min(A[1], B[1]), Math.max(A[2], B[2]), Math.max(A[3], B[3])]; lines[a].pts = lines[a].pts.concat(lines[b2].pts); lines.splice(b2, 1); }
+  }
+  return lines;
+}
 function readTag(n) { try { var s = n.getPluginData('dg'); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function ignored(n) { return /dg:ignore/.test(n.name) || n.getPluginData('ignore') === '1'; }
 
@@ -104,6 +138,10 @@ var API = {
       }
       if (frac >= BG_FRAC) { skipped++; return; }
       if (!isParent && n.type !== 'TEXT' && !paints(n) && !('effects' in n && n.effects.length)) return;   // invisible shape
+      if (n.type === 'TEXT') { var ls = textLines(n, o);
+        if (ls && ls.length) { var label = n.characters.replace(/\s+/g, ' ').slice(0, 28);
+          ls.forEach(function (L, li) { obs.push({ rect: L.r, pts: opts.shape ? thin(L.pts) : [], name: label + (ls.length > 1 ? ' \u00b7 ' + (li + 1) : ''), kind: 'TEXT', group: n.id }); });
+          return; } }
       var pts = []; if (opts.shape) collectPts(n, o, pts);
       obs.push({ rect: r, pts: thin(pts), name: n.type === 'TEXT' ? n.characters.slice(0, 32) : n.name, kind: n.type });
     }
@@ -152,11 +190,11 @@ var API = {
   remove: function (idx) { var n = removeIn(frameAt(idx)); figma.commitUndo(); return { removed: n }; },
 
   selectionRects: function (idx) {
-    var f = frameAt(idx), o = origin(f), sel = figma.currentPage.selection.filter(function (n) { return n.id !== f.id; });
+    var f = frameAt(idx), o = origin(f), sel = PAGE().selection.filter(function (n) { return n.id !== f.id; });
     if (!sel.length) throw new Error('Select something inside the frame first');
     return sel.map(function (n) { return boundsOf(n, o); }).filter(Boolean);
   },
-  goTo: function (idx) { var f = frameAt(idx); activeId = f.id; figma.currentPage.selection = [f]; figma.viewport.scrollAndZoomIntoView([f]); return idx; }
+  goTo: function (idx) { var f = frameAt(idx); activeId = f.id; PAGE().selection = [f]; figma.viewport.scrollAndZoomIntoView([f]); return idx; }
 };
 
 function n4(v) { return Math.round(v * 10000) / 10000; }

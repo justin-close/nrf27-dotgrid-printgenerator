@@ -10,3 +10,4 @@ test/*.jpg
 test/.*.jsx
 
 site/*.zip
+test/figma/*.jpg
